@@ -3,11 +3,13 @@ using CodePass.Web.Components.Pages;
 using CodePass.Web.Data.Entities;
 using CodePass.Web.Services.Solutions;
 using FluentAssertions;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CodePass.Web.Tests.Components;
 
-public sealed class RegisteredSolutionsPageTests : TestContext
+public sealed class RegisteredSolutionsManagementTests : TestContext
 {
     [Fact]
     public void EmptyState_ShouldRenderWhenNoSolutionsExist()
@@ -56,6 +58,56 @@ public sealed class RegisteredSolutionsPageTests : TestContext
         });
     }
 
+    [Fact]
+    public async Task ManageSave_ShouldRefreshCardListAfterSuccessfulUpdate()
+    {
+        var service = new FakeRegisteredSolutionService(
+            CreateSolution("Zulu", "/solutions/zulu.sln", RegisteredSolutionStatus.Valid),
+            CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid));
+        Services.AddSingleton<IRegisteredSolutionService>(service);
+        Services.AddSingleton<ISolutionPathValidator>(new FakeSolutionPathValidator(path => new SolutionPathValidationResult(RegisteredSolutionStatus.Valid, $"/canonical{path}", "Valid")));
+
+        var cut = RenderComponent<RegisteredSolutions>();
+        cut.WaitForAssertion(() => cut.FindAll("[data-testid='manage-solution-button']").Should().HaveCount(2));
+
+        await cut.FindAll("[data-testid='manage-solution-button']")[0].ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='edit-display-name-input']").ChangeAsync(new ChangeEventArgs { Value = "Omega" });
+        await cut.Find("form").SubmitAsync();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("[data-testid='solution-name']").Select(element => element.TextContent.Trim())
+                .Should()
+                .ContainInOrder("Omega", "Zulu");
+            service.UpdatedRequests.Should().ContainSingle();
+        });
+    }
+
+    [Fact]
+    public async Task ManageDelete_ShouldRefreshCardListAfterSuccessfulRemoval()
+    {
+        var alpha = CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var zulu = CreateSolution("Zulu", "/solutions/zulu.sln", RegisteredSolutionStatus.Valid);
+        var service = new FakeRegisteredSolutionService(alpha, zulu);
+        Services.AddSingleton<IRegisteredSolutionService>(service);
+        Services.AddSingleton<ISolutionPathValidator>(new FakeSolutionPathValidator(path => new SolutionPathValidationResult(RegisteredSolutionStatus.Valid, path, "Valid")));
+
+        var cut = RenderComponent<RegisteredSolutions>();
+        cut.WaitForAssertion(() => cut.FindAll("[data-testid='manage-solution-button']").Should().HaveCount(2));
+
+        await cut.FindAll("[data-testid='manage-solution-button']")[0].ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='show-delete-confirmation-button']").ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='confirm-delete-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("[data-testid='solution-name']").Select(element => element.TextContent.Trim())
+                .Should()
+                .ContainSingle().Which.Should().Be("Zulu");
+            service.DeletedIds.Should().ContainSingle(id => id == alpha.Id);
+        });
+    }
+
     private static RegisteredSolution CreateSolution(string displayName, string path, RegisteredSolutionStatus status, string? statusMessage = null)
         => new()
         {
@@ -77,6 +129,8 @@ internal sealed class FakeRegisteredSolutionService(params RegisteredSolution[] 
     public int RefreshAllCalls { get; private set; }
 
     public List<CreateRegisteredSolutionRequest> CreatedRequests { get; } = [];
+    public List<(Guid Id, UpdateRegisteredSolutionRequest Request)> UpdatedRequests { get; } = [];
+    public List<Guid> DeletedIds { get; } = [];
 
     public Task<IReadOnlyList<RegisteredSolution>> GetAllAsync(CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<RegisteredSolution>>(_solutions.OrderBy(solution => solution.DisplayName).ToList());
@@ -102,13 +156,29 @@ internal sealed class FakeRegisteredSolutionService(params RegisteredSolution[] 
     }
 
     public Task<RegisteredSolution> UpdateAsync(Guid id, UpdateRegisteredSolutionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException();
+    {
+        UpdatedRequests.Add((id, request));
+
+        var solution = _solutions.Single(item => item.Id == id);
+        solution.DisplayName = request.DisplayName;
+        solution.SolutionPath = request.SolutionPath;
+        solution.Status = RegisteredSolutionStatus.Valid;
+        solution.StatusMessage = "Valid";
+        solution.LastValidatedAtUtc = DateTimeOffset.UtcNow;
+        solution.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        return Task.FromResult(solution);
+    }
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException();
+    {
+        DeletedIds.Add(id);
+        _solutions.RemoveAll(solution => solution.Id == id);
+        return Task.CompletedTask;
+    }
 
     public Task<RegisteredSolution?> RefreshAsync(Guid id, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException();
+        => Task.FromResult(_solutions.SingleOrDefault(solution => solution.Id == id));
 
     public Task<int> RefreshAllAsync(CancellationToken cancellationToken = default)
     {
