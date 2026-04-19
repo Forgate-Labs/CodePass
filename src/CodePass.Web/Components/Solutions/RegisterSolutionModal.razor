@@ -1,0 +1,190 @@
+@using System.ComponentModel.DataAnnotations
+@using System.IO
+@using CodePass.Web.Services.Solutions
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+@inject ISolutionPathValidator SolutionPathValidator
+@inject IRegisteredSolutionService RegisteredSolutionService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title h4 mb-1">Register solution</h2>
+                        <p class="text-body-secondary mb-0">Pick a <code>.sln</code> file, confirm the real local path, and save it to CodePass.</p>
+                    </div>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
+                </div>
+
+                <EditForm EditContext="EditContext" OnValidSubmit="HandleValidSubmitAsync">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body d-flex flex-column gap-3">
+                        @if (!string.IsNullOrWhiteSpace(SubmissionError))
+                        {
+                            <div class="alert alert-danger mb-0" role="alert" data-testid="submission-error">@SubmissionError</div>
+                        }
+
+                        <div>
+                            <label class="form-label" for="display-name">Display name</label>
+                            <InputText id="display-name" class="form-control" @bind-Value="Model.DisplayName" data-testid="display-name-input" />
+                            <ValidationMessage For="() => Model.DisplayName" />
+                        </div>
+
+                        <div>
+                            <label class="form-label" for="solution-path">SolutionPath</label>
+                            <div class="input-group">
+                                <InputText id="solution-path" class="form-control" @bind-Value="Model.SolutionPath" data-testid="solution-path-input" />
+                                <button class="btn btn-outline-secondary" type="button" @onclick="BrowseAsync" data-testid="browse-button">Browse...</button>
+                            </div>
+                            <div class="form-text">Browsers may hide the real local path. Confirm or paste the actual absolute <code>.sln</code> path before saving.</div>
+                            <ValidationMessage For="() => Model.SolutionPath" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="CloseAsync" disabled="@IsSubmitting">Cancel</button>
+                        <button class="btn btn-primary" type="submit" disabled="@IsSubmitting">@(IsSubmitting ? "Saving..." : "Save solution")</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private readonly RegisterSolutionModel Model = new();
+    private ValidationMessageStore? ValidationMessageStore { get; set; }
+    private EditContext EditContext { get; set; } = default!;
+    private string? SubmissionError { get; set; }
+    private bool IsSubmitting { get; set; }
+
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnRegistered { get; set; }
+
+    protected override void OnInitialized()
+    {
+        EditContext = new EditContext(Model);
+        ValidationMessageStore = new ValidationMessageStore(EditContext);
+        EditContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen)
+        {
+            SubmissionError = null;
+            ValidationMessageStore?.Clear();
+        }
+    }
+
+    public async Task ApplyPickerResultAsync(SolutionPickerResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.FileName))
+        {
+            Model.DisplayName = Path.GetFileNameWithoutExtension(result.FileName);
+            EditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Model.DisplayName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.SuggestedPath))
+        {
+            Model.SolutionPath = result.SuggestedPath;
+            EditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Model.SolutionPath));
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task BrowseAsync()
+    {
+        var result = await JSRuntime.InvokeAsync<SolutionPickerResult?>("codePass.solutionPicker.pickSolution");
+        if (result is null)
+        {
+            return;
+        }
+
+        await ApplyPickerResultAsync(result);
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        SubmissionError = null;
+        ValidationMessageStore?.Clear();
+
+        var validation = await SolutionPathValidator.ValidateAsync(Model.SolutionPath);
+        if (!validation.IsValid)
+        {
+            ValidationMessageStore?.Add(() => Model.SolutionPath, validation.Message ?? "The selected solution path is invalid.");
+            EditContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        try
+        {
+            IsSubmitting = true;
+            await RegisteredSolutionService.CreateAsync(new CreateRegisteredSolutionRequest(Model.DisplayName, Model.SolutionPath));
+            Reset();
+            await OnRegistered.InvokeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            SubmissionError = ex.Message;
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        Reset();
+        await OnClose.InvokeAsync();
+    }
+
+    private void Reset()
+    {
+        Model.DisplayName = string.Empty;
+        Model.SolutionPath = string.Empty;
+        SubmissionError = null;
+        ValidationMessageStore?.Clear();
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        SubmissionError = null;
+    }
+
+    public void Dispose()
+    {
+        EditContext.OnFieldChanged -= HandleFieldChanged;
+    }
+
+    public sealed class RegisterSolutionModel
+    {
+        [Required(ErrorMessage = "Display name is required.")]
+        [StringLength(200, ErrorMessage = "Display name must be 200 characters or fewer.")]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Solution path is required.")]
+        [StringLength(2048, ErrorMessage = "Solution path must be 2048 characters or fewer.")]
+        public string SolutionPath { get; set; } = string.Empty;
+    }
+
+    public sealed class SolutionPickerResult
+    {
+        public string? FileName { get; set; }
+        public string? SuggestedPath { get; set; }
+    }
+}

@@ -1,0 +1,58 @@
+@using CodePass.Web.Data.Entities
+
+<div class="card h-100 shadow-sm border-0" data-testid="solution-card">
+    <div class="card-body d-flex flex-column gap-3">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+            <div>
+                <h2 class="h4 mb-1" data-testid="solution-name">@Solution.DisplayName</h2>
+                <p class="text-body-secondary mb-0">Registered <span title="Created at">@Solution.CreatedAtUtc.ToLocalTime().ToString("g")</span></p>
+            </div>
+
+            <span class="badge @GetStatusBadgeClass(Solution.Status)" data-testid="solution-status">@GetStatusLabel(Solution.Status)</span>
+        </div>
+
+        <dl class="row mb-0">
+            <dt class="col-sm-4 text-body-secondary">Path</dt>
+            <dd class="col-sm-8 mb-2 text-break" data-testid="solution-path">@Solution.SolutionPath</dd>
+
+            <dt class="col-sm-4 text-body-secondary">Status</dt>
+            <dd class="col-sm-8 mb-2">@GetStatusDescription(Solution)</dd>
+
+            <dt class="col-sm-4 text-body-secondary">Last validated</dt>
+            <dd class="col-sm-8 mb-0" data-testid="solution-last-validated">@GetLastValidatedText(Solution.LastValidatedAtUtc)</dd>
+        </dl>
+
+        <div class="mt-auto d-flex justify-content-end">
+            <button type="button" class="btn btn-outline-secondary" disabled>Manage</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RegisteredSolution Solution { get; set; } = default!;
+
+    private static string GetStatusLabel(RegisteredSolutionStatus status) => status switch
+    {
+        RegisteredSolutionStatus.Valid => "Valid",
+        RegisteredSolutionStatus.FileNotFound => "File not found",
+        RegisteredSolutionStatus.PathInaccessible => "Path inaccessible",
+        _ => "Invalid"
+    };
+
+    private static string GetStatusBadgeClass(RegisteredSolutionStatus status) => status switch
+    {
+        RegisteredSolutionStatus.Valid => "text-bg-success",
+        RegisteredSolutionStatus.FileNotFound => "text-bg-warning",
+        RegisteredSolutionStatus.PathInaccessible => "text-bg-warning",
+        _ => "text-bg-danger"
+    };
+
+    private static string GetStatusDescription(RegisteredSolution solution)
+        => string.IsNullOrWhiteSpace(solution.StatusMessage)
+            ? GetStatusLabel(solution.Status)
+            : solution.StatusMessage;
+
+    private static string GetLastValidatedText(DateTimeOffset? lastValidatedAtUtc)
+        => lastValidatedAtUtc?.ToLocalTime().ToString("g") ?? "Not validated yet";
+}

@@ -1,0 +1,108 @@
+@page "/solutions"
+@using CodePass.Web.Components.Solutions
+@using CodePass.Web.Data.Entities
+@using CodePass.Web.Services.Solutions
+@inject IRegisteredSolutionService RegisteredSolutionService
+
+<PageTitle>Registered Solutions</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">Registered Solutions</h1>
+            <p class="text-body-secondary mb-0">Manage the local <code>.sln</code> files that CodePass can analyze.</p>
+        </div>
+
+        <button class="btn btn-primary align-self-start" type="button" @onclick="OpenRegisterModal">
+            Add solution
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(LoadError))
+    {
+        <div class="alert alert-danger" role="alert">@LoadError</div>
+    }
+
+    @if (IsLoading)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p class="mb-0 text-body-secondary">Loading registered solutions...</p>
+            </div>
+        </div>
+    }
+    else if (Solutions.Count == 0)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4 text-center">
+                <h2 class="h4 mb-2">No registered solutions yet</h2>
+                <p class="text-body-secondary mb-3">Start by selecting a <code>.sln</code> file and confirming the local path you want CodePass to store.</p>
+                <button class="btn btn-outline-primary" type="button" @onclick="OpenRegisterModal">Register your first solution</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3" data-testid="solutions-list">
+            @foreach (var solution in Solutions)
+            {
+                <div class="col-12 col-xl-6" data-testid="solution-card-item">
+                    <SolutionCard Solution="solution" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<RegisterSolutionModal IsOpen="IsRegisterModalOpen"
+                       OnClose="CloseRegisterModal"
+                       OnRegistered="HandleRegisteredAsync" />
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private bool IsRegisterModalOpen { get; set; }
+    private string? LoadError { get; set; }
+    private IReadOnlyList<RegisteredSolution> Solutions { get; set; } = Array.Empty<RegisteredSolution>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSolutionsAsync();
+    }
+
+    private async Task LoadSolutionsAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            LoadError = null;
+            await RegisteredSolutionService.RefreshAllAsync();
+            Solutions = await RegisteredSolutionService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            LoadError = $"Unable to load registered solutions: {ex.Message}";
+            Solutions = Array.Empty<RegisteredSolution>();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void OpenRegisterModal()
+    {
+        IsRegisterModalOpen = true;
+    }
+
+    private Task CloseRegisterModal()
+    {
+        IsRegisterModalOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleRegisteredAsync()
+    {
+        IsRegisterModalOpen = false;
+        await LoadSolutionsAsync();
+    }
+}
