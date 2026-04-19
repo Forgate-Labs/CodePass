@@ -34,12 +34,16 @@
                         </div>
 
                         <div>
-                            <label class="form-label" for="solution-path">SolutionPath</label>
+                            <label class="form-label" for="solution-path">Solution path</label>
                             <div class="input-group">
                                 <InputText id="solution-path" class="form-control" @bind-Value="Model.SolutionPath" data-testid="solution-path-input" />
                                 <button class="btn btn-outline-secondary" type="button" @onclick="BrowseAsync" data-testid="browse-button">Browse...</button>
                             </div>
                             <div class="form-text">Browsers may hide the real local path. Confirm or paste the actual absolute <code>.sln</code> path before saving.</div>
+                            @if (!string.IsNullOrWhiteSpace(PickerHint))
+                            {
+                                <div class="alert alert-warning mt-2 mb-0" role="alert" data-testid="picker-hint">@PickerHint</div>
+                            }
                             <ValidationMessage For="() => Model.SolutionPath" />
                         </div>
                     </div>
@@ -61,6 +65,7 @@
     private ValidationMessageStore? ValidationMessageStore { get; set; }
     private EditContext EditContext { get; set; } = default!;
     private string? SubmissionError { get; set; }
+    private string? PickerHint { get; set; }
     private bool IsSubmitting { get; set; }
 
     [Parameter]
@@ -84,6 +89,7 @@
         if (IsOpen)
         {
             SubmissionError = null;
+            PickerHint = null;
             ValidationMessageStore?.Clear();
         }
     }
@@ -96,12 +102,20 @@
             EditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Model.DisplayName));
         }
 
-        if (!string.IsNullOrWhiteSpace(result.SuggestedPath))
+        var suggestedPath = result.SuggestedPath?.Trim();
+        string? pickerHint = null;
+        if (HasUsableAbsolutePath(suggestedPath))
         {
-            Model.SolutionPath = result.SuggestedPath;
-            EditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Model.SolutionPath));
+            Model.SolutionPath = suggestedPath!;
+        }
+        else
+        {
+            Model.SolutionPath = string.Empty;
+            pickerHint = BuildPickerHint(result.FileName, suggestedPath);
         }
 
+        EditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Model.SolutionPath));
+        PickerHint = pickerHint;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -120,6 +134,13 @@
     {
         SubmissionError = null;
         ValidationMessageStore?.Clear();
+
+        if (!HasUsableAbsolutePath(Model.SolutionPath))
+        {
+            ValidationMessageStore?.Add(() => Model.SolutionPath, "Paste the absolute local path to the .sln file before saving.");
+            EditContext.NotifyValidationStateChanged();
+            return;
+        }
 
         var validation = await SolutionPathValidator.ValidateAsync(Model.SolutionPath);
         if (!validation.IsValid)
@@ -157,6 +178,7 @@
         Model.DisplayName = string.Empty;
         Model.SolutionPath = string.Empty;
         SubmissionError = null;
+        PickerHint = null;
         ValidationMessageStore?.Clear();
         EditContext.NotifyValidationStateChanged();
     }
@@ -164,6 +186,39 @@
     private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
     {
         SubmissionError = null;
+
+        if (e.FieldIdentifier.FieldName == nameof(RegisterSolutionModel.SolutionPath))
+        {
+            PickerHint = null;
+            ValidationMessageStore?.Clear(e.FieldIdentifier);
+            EditContext.NotifyValidationStateChanged();
+        }
+    }
+
+    private static bool HasUsableAbsolutePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var trimmedPath = path.Trim();
+        return Path.IsPathRooted(trimmedPath)
+            && !trimmedPath.Contains("fakepath", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildPickerHint(string? fileName, string? suggestedPath)
+    {
+        var selectedFileName = string.IsNullOrWhiteSpace(fileName)
+            ? ".sln file"
+            : fileName;
+
+        if (!string.IsNullOrWhiteSpace(suggestedPath) && suggestedPath.Contains("fakepath", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"The browser only exposed a placeholder path for {selectedFileName}. Paste the real absolute local .sln path before saving.";
+        }
+
+        return $"The browser selected {selectedFileName}, but it did not expose the real absolute local path. Paste the full .sln path before saving.";
     }
 
     public void Dispose()
