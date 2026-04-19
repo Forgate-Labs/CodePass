@@ -23,7 +23,7 @@
         </dl>
 
         <div class="mt-auto d-flex justify-content-end">
-            <button type="button" class="btn btn-outline-secondary" disabled>Manage</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="HandleManageClicked" data-testid="manage-solution-button">Manage</button>
         </div>
     </div>
 </div>
@@ -31,6 +31,12 @@
 @code {
     [Parameter, EditorRequired]
     public RegisteredSolution Solution { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<RegisteredSolution> OnManage { get; set; }
+
+    private Task HandleManageClicked()
+        => OnManage.InvokeAsync(Solution);
 
     private static string GetStatusLabel(RegisteredSolutionStatus status) => status switch
     {

@@ -47,7 +47,7 @@
             @foreach (var solution in Solutions)
             {
                 <div class="col-12 col-xl-6" data-testid="solution-card-item">
-                    <SolutionCard Solution="solution" />
+                    <SolutionCard Solution="solution" OnManage="OpenEditModal" />
                 </div>
             }
         </div>
@@ -58,10 +58,18 @@
                        OnClose="CloseRegisterModal"
                        OnRegistered="HandleRegisteredAsync" />
 
+<EditSolutionModal IsOpen="IsEditModalOpen"
+                   Solution="SelectedSolution"
+                   OnClose="CloseEditModal"
+                   OnSaved="HandleEditedAsync"
+                   OnDeleted="HandleEditedAsync" />
+
 @code {
     private bool IsLoading { get; set; } = true;
     private bool IsRegisterModalOpen { get; set; }
+    private bool IsEditModalOpen { get; set; }
     private string? LoadError { get; set; }
+    private RegisteredSolution? SelectedSolution { get; set; }
     private IReadOnlyList<RegisteredSolution> Solutions { get; set; } = Array.Empty<RegisteredSolution>();
 
     protected override async Task OnInitializedAsync()
@@ -100,9 +108,30 @@
         return Task.CompletedTask;
     }
 
+    private Task OpenEditModal(RegisteredSolution solution)
+    {
+        SelectedSolution = solution;
+        IsEditModalOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseEditModal()
+    {
+        SelectedSolution = null;
+        IsEditModalOpen = false;
+        return Task.CompletedTask;
+    }
+
     private async Task HandleRegisteredAsync()
     {
         IsRegisterModalOpen = false;
+        await LoadSolutionsAsync();
+    }
+
+    private async Task HandleEditedAsync()
+    {
+        SelectedSolution = null;
+        IsEditModalOpen = false;
         await LoadSolutionsAsync();
     }
 }
