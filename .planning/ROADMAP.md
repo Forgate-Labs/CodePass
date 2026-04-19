@@ -29,7 +29,7 @@ CodePass v1 moves from trusted local solution registration, to user-authored rul
 **Plans**: 3 plans
 Plans:
 - [x] 01-01-PLAN.md — Scaffold the Blazor Server + SQLite registration foundation, validation rules, and status-refresh backend.
-- [ ] 01-02-PLAN.md — Build the registered-solutions page with card layout, add modal, and picker-assisted create flow.
+- [x] 01-02-PLAN.md — Build the registered-solutions page with card layout, add modal, and picker-assisted create flow.
 - [ ] 01-03-PLAN.md — Add the edit/remove modal workflow and final full-flow verification.
 
 ### Phase 2: User-Authored Rule Definitions
@@ -104,7 +104,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Registered Solutions | 1/3 | In Progress | - |
+| 1. Registered Solutions | 2/3 | In Progress | - |
 | 2. User-Authored Rule Definitions | 0/TBD | Not started | - |
 | 3. Rule Analysis Review | 0/TBD | Not started | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
