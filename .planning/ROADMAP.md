@@ -10,7 +10,7 @@ CodePass v1 moves from trusted local solution registration, to user-authored rul
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Registered Solutions** - Users can register, inspect, and maintain the local `.sln` targets CodePass analyzes.
+- [x] **Phase 1: Registered Solutions** - Users can register, inspect, and maintain the local `.sln` targets CodePass analyzes.
 - [ ] **Phase 2: User-Authored Rule Definitions** - Admin users can create and edit only user-authored rules through the DSL-backed rule editor.
 - [ ] **Phase 3: Rule Analysis Review** - Users can apply authored rules to solutions, run analysis manually, and inspect actionable findings.
 - [ ] **Phase 4: Coverage Analysis Review** - Users can run coverage analysis manually and inspect normalized coverage results.
@@ -30,7 +30,7 @@ CodePass v1 moves from trusted local solution registration, to user-authored rul
 Plans:
 - [x] 01-01-PLAN.md — Scaffold the Blazor Server + SQLite registration foundation, validation rules, and status-refresh backend.
 - [x] 01-02-PLAN.md — Build the registered-solutions page with card layout, add modal, and picker-assisted create flow.
-- [ ] 01-03-PLAN.md — Add the edit/remove modal workflow and final full-flow verification.
+- [x] 01-03-PLAN.md — Add the edit/remove modal workflow and final full-flow verification.
 
 ### Phase 2: User-Authored Rule Definitions
 **Goal**: Admin users can define and maintain custom analysis rules without relying on shipped production rule packs.
@@ -104,7 +104,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Registered Solutions | 2/3 | In Progress | - |
+| 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
 | 2. User-Authored Rule Definitions | 0/TBD | Not started | - |
 | 3. Rule Analysis Review | 0/TBD | Not started | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
