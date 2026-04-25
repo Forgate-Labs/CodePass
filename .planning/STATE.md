@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-04-25T03:26:43.166Z"
-last_activity: 2026-04-25 — Completed plan 02-03 with raw JSON authored-rule editing, validation fixes, and approved /rules workflow verification.
+status: planning
+stopped_at: Completed 03-rule-analysis-review-01-PLAN.md
+last_updated: "2026-04-25T03:50:20.775Z"
+last_activity: 2026-04-25 — Completed plan 03-01 with per-solution authored-rule assignment persistence, selection services, and SQLite upgrade coverage.
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 12
+  completed_plans: 7
+  percent: 58
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** Make it easy to run lightweight, deeply .NET-native code analysis locally and define custom rules without fighting a generic, infrastructure-heavy platform.
-**Current focus:** Phase 2 - User-Authored Rule Definitions
+**Current focus:** Phase 3 - Rule Analysis Review
 
 ## Current Position
 
 Phase: 3 of 5 (Rule Analysis Review)
-Plan: TBD (phase not planned yet)
-Status: Phase 2 complete; ready to plan Phase 3
-Last activity: 2026-04-25 — Completed plan 02-03 with raw JSON authored-rule editing, validation fixes, and approved /rules workflow verification.
+Plan: 2 of 6 (next: 03-02-PLAN.md)
+Status: Phase 3 in progress; 03-01 complete
+Last activity: 2026-04-25 — Completed plan 03-01 with per-solution authored-rule assignment persistence, selection services, and SQLite upgrade coverage.
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 58%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 31.0 min
-- Total execution time: 3.1 hours
+- Total plans completed: 7
+- Average duration: 27.0 min
+- Total execution time: 3.2 hours
 
 **By Phase:**
 
@@ -45,16 +45,18 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
 | 02-user-authored-rule-definitions | 3 | 125 min | 41.7 min |
+| 03-rule-analysis-review | 1 | 3 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-registered-solutions-02 (10 min), 01-registered-solutions-03 (20 min), 02-user-authored-rule-definitions-01 (8 min), 02-user-authored-rule-definitions-02 (22 min), 02-user-authored-rule-definitions-03 (1h 35m)
-- Trend: Slower due to checkpoint-discovered UI/runtime fixes
+- Last 5 plans: 01-registered-solutions-03 (20 min), 02-user-authored-rule-definitions-01 (8 min), 02-user-authored-rule-definitions-02 (22 min), 02-user-authored-rule-definitions-03 (1h 35m), 03-rule-analysis-review-01 (3 min)
+- Trend: Phase 3 backend foundation started quickly after Phase 2 checkpoint-heavy UI work.
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
 | Phase 02 P01 | 8 min | 3 tasks | 11 files |
 | Phase 02 P02 | 22 min | 3 tasks | 7 files |
 | Phase 02-user-authored-rule-definitions P03 | 1h 35m | 3 tasks | 9 files |
+| Phase 03-rule-analysis-review P01 | 3 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -82,6 +84,9 @@ Recent decisions affecting current work:
 - [Phase 02-user-authored-rule-definitions]: Keep raw JSON editing inside the existing authored-rule editor so schema mode and direct DSL mode operate on one persisted user-authored rule document. — Avoids a separate editor surface or external editor dependency while preserving reopen/edit behavior.
 - [Phase 02-user-authored-rule-definitions]: Use RuleDefinitionService validation as the source of truth for raw JSON saves. — Ensures UI and persistence paths enforce the same supported kind/schema and required DSL fields.
 - [Phase 02-user-authored-rule-definitions]: Initialize missing authored-rule tables at startup for existing local SQLite databases. — Keeps local self-hosted developer databases working without manual deletion or setup.
+- [Phase 03-rule-analysis-review]: Persist per-solution rule applicability as explicit SolutionRuleAssignment rows instead of inferring active rules from global authored-rule state.
+- [Phase 03-rule-analysis-review]: Require both the authored rule's global IsEnabled flag and the per-solution assignment IsEnabled flag before a rule is returned for analysis.
+- [Phase 03-rule-analysis-review]: Keep SQLite startup initialization additive and idempotent so existing local databases gain assignment support without manual deletion.
 
 ### Pending Todos
 
@@ -93,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-25T03:26:43.164Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-04-25T03:50:20.773Z
+Stopped at: Completed 03-rule-analysis-review-01-PLAN.md
 Resume file: None

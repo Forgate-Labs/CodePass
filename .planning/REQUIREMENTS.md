@@ -14,7 +14,7 @@
 - [ ] **RULE-01**: User can manually start a rule-analysis run for a registered solution.
 - [x] **RULE-02**: User can create a custom rule from scratch through a schema-driven editor backed by the rule DSL.
 - [x] **RULE-03**: User can edit a custom rule as raw JSON when they need direct control over the DSL.
-- [ ] **RULE-04**: User can enable or disable a custom rule per registered solution.
+- [x] **RULE-04**: User can enable or disable a custom rule per registered solution.
 - [ ] **RULE-05**: User can review rule-analysis results grouped by rule.
 - [ ] **RULE-06**: User can inspect each rule violation with its severity, file path, and code location.
 - [x] **RULE-07**: User can work only with user-authored rules in the product, without depending on built-in production rule packs.
@@ -60,7 +60,7 @@
 | RULE-03 | Phase 2 - User-Authored Rule Definitions | Complete |
 | RULE-07 | Phase 2 - User-Authored Rule Definitions | Complete |
 | RULE-01 | Phase 3 - Rule Analysis Review | Pending |
-| RULE-04 | Phase 3 - Rule Analysis Review | Pending |
+| RULE-04 | Phase 3 - Rule Analysis Review | Complete |
 | RULE-05 | Phase 3 - Rule Analysis Review | Pending |
 | RULE-06 | Phase 3 - Rule Analysis Review | Pending |
 | COV-01 | Phase 4 - Coverage Analysis Review | Pending |
@@ -72,4 +72,4 @@
 | DASH-03 | Phase 5 - Quality Score Dashboard | Pending |
 
 ---
-*Last updated: 2026-04-25 after Phase 02-03 completion*
+*Last updated: 2026-04-25 after Phase 03-01 completion*

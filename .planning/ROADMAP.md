@@ -55,7 +55,14 @@ Plans:
   2. User can manually start a rule-analysis run for a registered solution.
   3. After a run completes, user can review rule-analysis results grouped by rule.
   4. User can inspect each reported violation with its severity, file path, and code location.
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [x] 03-01-PLAN.md — Add per-solution authored-rule assignment persistence and selection services.
+- [ ] 03-02-PLAN.md — Build the Roslyn-backed authored-rule analyzer with TDD coverage.
+- [ ] 03-03-PLAN.md — Persist rule-analysis runs and grouped violation results.
+- [ ] 03-04-PLAN.md — Wire manual run orchestration from selected rules to persisted results.
+- [ ] 03-05-PLAN.md — Build the `/analysis/rules` UI for rule selection, manual runs, and grouped results.
+- [ ] 03-06-PLAN.md — Verify the completed rule-analysis workflow in the running app.
 
 ### Phase 4: Coverage Analysis Review
 **Goal**: Users can run coverage analysis for a registered solution and inspect the normalized coverage outputs CodePass uses.
@@ -110,6 +117,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
 | 2. User-Authored Rule Definitions | 3/3 | Complete | 2026-04-25 |
-| 3. Rule Analysis Review | 0/TBD | Not started | - |
+| 3. Rule Analysis Review | 1/6 | In Progress | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |
