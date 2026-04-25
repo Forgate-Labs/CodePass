@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Completed 03-rule-analysis-review-01-PLAN.md
-last_updated: "2026-04-25T03:50:20.775Z"
+status: executing
+stopped_at: Completed 03-rule-analysis-review-02-PLAN.md
+last_updated: "2026-04-25T03:52:34.704Z"
 last_activity: 2026-04-25 — Completed plan 03-01 with per-solution authored-rule assignment persistence, selection services, and SQLite upgrade coverage.
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 7
-  percent: 58
+  completed_plans: 8
+  percent: 67
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 3 of 5 (Rule Analysis Review)
-Plan: 2 of 6 (next: 03-02-PLAN.md)
-Status: Phase 3 in progress; 03-01 complete
-Last activity: 2026-04-25 — Completed plan 03-01 with per-solution authored-rule assignment persistence, selection services, and SQLite upgrade coverage.
+Plan: 3 of 6 (next: 03-03-PLAN.md)
+Status: Phase 3 in progress; 03-02 complete
+Last activity: 2026-04-25 — Completed plan 03-02 with Roslyn-backed authored-rule analysis, precise finding locations, and analyzer edge-case coverage.
 
-Progress: [██████░░░░] 58%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 27.0 min
-- Total execution time: 3.2 hours
+- Total plans completed: 8
+- Average duration: 24.4 min
+- Total execution time: 3.3 hours
 
 **By Phase:**
 
@@ -45,11 +45,11 @@ Progress: [██████░░░░] 58%
 |-------|-------|-------|----------|
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
 | 02-user-authored-rule-definitions | 3 | 125 min | 41.7 min |
-| 03-rule-analysis-review | 1 | 3 min | 3.0 min |
+| 03-rule-analysis-review | 2 | 8 min | 4.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-registered-solutions-03 (20 min), 02-user-authored-rule-definitions-01 (8 min), 02-user-authored-rule-definitions-02 (22 min), 02-user-authored-rule-definitions-03 (1h 35m), 03-rule-analysis-review-01 (3 min)
-- Trend: Phase 3 backend foundation started quickly after Phase 2 checkpoint-heavy UI work.
+- Last 5 plans: 02-user-authored-rule-definitions-01 (8 min), 02-user-authored-rule-definitions-02 (22 min), 02-user-authored-rule-definitions-03 (1h 35m), 03-rule-analysis-review-01 (3 min), 03-rule-analysis-review-02 (5 min)
+- Trend: Phase 3 backend analysis foundations are moving quickly after Phase 2 checkpoint-heavy UI work.
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
@@ -57,6 +57,7 @@ Progress: [██████░░░░] 58%
 | Phase 02 P02 | 22 min | 3 tasks | 7 files |
 | Phase 02-user-authored-rule-definitions P03 | 1h 35m | 3 tasks | 9 files |
 | Phase 03-rule-analysis-review P01 | 3 min | 3 tasks | 10 files |
+| Phase 03-rule-analysis-review P02 | 5 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Recent decisions affecting current work:
 - [Phase 03-rule-analysis-review]: Persist per-solution rule applicability as explicit SolutionRuleAssignment rows instead of inferring active rules from global authored-rule state.
 - [Phase 03-rule-analysis-review]: Require both the authored rule's global IsEnabled flag and the per-solution assignment IsEnabled flag before a rule is returned for analysis.
 - [Phase 03-rule-analysis-review]: Keep SQLite startup initialization additive and idempotent so existing local databases gain assignment support without manual deletion.
+- [Phase 03-rule-analysis-review]: Execute only the AuthoredRuleDefinitionDto instances passed to the analyzer; unknown rule kinds are skipped so catalog evolution does not activate built-in rules or crash existing runs. — Preserves the v1 authored-rule-only constraint while allowing the closed engine catalog to evolve safely.
+- [Phase 03-rule-analysis-review]: Use MSBuildWorkspace with guarded MSBuildLocator.RegisterDefaults() for local solution loading, while excluding MSBuild framework runtime assets to avoid assembly-loading conflicts. — The analyzer must load real local .sln files reliably from the self-hosted process without copying conflicting MSBuild assemblies.
+- [Phase 03-rule-analysis-review]: Return analyzer locations as solution-relative paths plus 1-based line and column spans from Roslyn Location data. — Persisted results and UI views need actionable, user-readable code positions independent of absolute machine paths.
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-25T03:50:20.773Z
-Stopped at: Completed 03-rule-analysis-review-01-PLAN.md
+Last session: 2026-04-25T03:52:22.306Z
+Stopped at: Completed 03-rule-analysis-review-02-PLAN.md
 Resume file: None
