@@ -7,6 +7,7 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
 {
     public DbSet<RegisteredSolution> RegisteredSolutions => Set<RegisteredSolution>();
     public DbSet<AuthoredRuleDefinition> AuthoredRuleDefinitions => Set<AuthoredRuleDefinition>();
+    public DbSet<SolutionRuleAssignment> SolutionRuleAssignments => Set<SolutionRuleAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,5 +35,22 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
         authoredRuleDefinition.Property(rule => rule.IsEnabled).IsRequired();
         authoredRuleDefinition.HasIndex(rule => rule.Code).IsUnique();
         authoredRuleDefinition.HasIndex(rule => rule.RuleKind);
+
+        var solutionRuleAssignment = modelBuilder.Entity<SolutionRuleAssignment>();
+
+        solutionRuleAssignment.HasKey(assignment => assignment.Id);
+        solutionRuleAssignment.Property(assignment => assignment.IsEnabled).IsRequired();
+        solutionRuleAssignment.HasOne<RegisteredSolution>()
+            .WithMany()
+            .HasForeignKey(assignment => assignment.RegisteredSolutionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        solutionRuleAssignment.HasOne<AuthoredRuleDefinition>()
+            .WithMany()
+            .HasForeignKey(assignment => assignment.AuthoredRuleDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        solutionRuleAssignment.HasIndex(assignment => new { assignment.RegisteredSolutionId, assignment.AuthoredRuleDefinitionId })
+            .IsUnique();
     }
 }

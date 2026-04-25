@@ -14,30 +14,28 @@ public static class CodePassDatabaseInitializer
             return;
         }
 
-        if (await TableExistsAsync(dbContext, "AuthoredRuleDefinitions", cancellationToken))
+        if (!await TableExistsAsync(dbContext, "AuthoredRuleDefinitions", cancellationToken))
         {
-            return;
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "AuthoredRuleDefinitions" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_AuthoredRuleDefinitions" PRIMARY KEY,
+                    "Code" TEXT NOT NULL,
+                    "Title" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "RuleKind" TEXT NOT NULL,
+                    "SchemaVersion" TEXT NOT NULL,
+                    "Severity" TEXT NOT NULL,
+                    "ScopeJson" TEXT NOT NULL,
+                    "ParametersJson" TEXT NOT NULL,
+                    "RawDefinitionJson" TEXT NOT NULL,
+                    "IsEnabled" INTEGER NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NOT NULL
+                );
+                """,
+                cancellationToken);
         }
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            CREATE TABLE IF NOT EXISTS "AuthoredRuleDefinitions" (
-                "Id" TEXT NOT NULL CONSTRAINT "PK_AuthoredRuleDefinitions" PRIMARY KEY,
-                "Code" TEXT NOT NULL,
-                "Title" TEXT NOT NULL,
-                "Description" TEXT NULL,
-                "RuleKind" TEXT NOT NULL,
-                "SchemaVersion" TEXT NOT NULL,
-                "Severity" TEXT NOT NULL,
-                "ScopeJson" TEXT NOT NULL,
-                "ParametersJson" TEXT NOT NULL,
-                "RawDefinitionJson" TEXT NOT NULL,
-                "IsEnabled" INTEGER NOT NULL,
-                "CreatedAtUtc" TEXT NOT NULL,
-                "UpdatedAtUtc" TEXT NOT NULL
-            );
-            """,
-            cancellationToken);
 
         await dbContext.Database.ExecuteSqlRawAsync(
             "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_AuthoredRuleDefinitions_Code\" ON \"AuthoredRuleDefinitions\" (\"Code\");",
@@ -45,6 +43,28 @@ public static class CodePassDatabaseInitializer
 
         await dbContext.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS \"IX_AuthoredRuleDefinitions_RuleKind\" ON \"AuthoredRuleDefinitions\" (\"RuleKind\");",
+            cancellationToken);
+
+        if (!await TableExistsAsync(dbContext, "SolutionRuleAssignments", cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "SolutionRuleAssignments" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_SolutionRuleAssignments" PRIMARY KEY,
+                    "RegisteredSolutionId" TEXT NOT NULL,
+                    "AuthoredRuleDefinitionId" TEXT NOT NULL,
+                    "IsEnabled" INTEGER NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_SolutionRuleAssignments_RegisteredSolutions_RegisteredSolutionId" FOREIGN KEY ("RegisteredSolutionId") REFERENCES "RegisteredSolutions" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_SolutionRuleAssignments_AuthoredRuleDefinitions_AuthoredRuleDefinitionId" FOREIGN KEY ("AuthoredRuleDefinitionId") REFERENCES "AuthoredRuleDefinitions" ("Id") ON DELETE CASCADE
+                );
+                """,
+                cancellationToken);
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SolutionRuleAssignments_RegisteredSolutionId_AuthoredRuleDefinitionId\" ON \"SolutionRuleAssignments\" (\"RegisteredSolutionId\", \"AuthoredRuleDefinitionId\");",
             cancellationToken);
     }
 
