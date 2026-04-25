@@ -58,8 +58,8 @@ Plans:
 **Plans**: 6 plans
 Plans:
 - [x] 03-01-PLAN.md — Add per-solution authored-rule assignment persistence and selection services.
-- [ ] 03-02-PLAN.md — Build the Roslyn-backed authored-rule analyzer with TDD coverage.
-- [ ] 03-03-PLAN.md — Persist rule-analysis runs and grouped violation results.
+- [x] 03-02-PLAN.md — Build the Roslyn-backed authored-rule analyzer with TDD coverage.
+- [x] 03-03-PLAN.md — Persist rule-analysis runs and grouped violation results.
 - [ ] 03-04-PLAN.md — Wire manual run orchestration from selected rules to persisted results.
 - [ ] 03-05-PLAN.md — Build the `/analysis/rules` UI for rule selection, manual runs, and grouped results.
 - [ ] 03-06-PLAN.md — Verify the completed rule-analysis workflow in the running app.
@@ -117,6 +117,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
 | 2. User-Authored Rule Definitions | 3/3 | Complete | 2026-04-25 |
-| 3. Rule Analysis Review | 2/6 | In Progress | - |
+| 3. Rule Analysis Review | 3/6 | In Progress | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |
