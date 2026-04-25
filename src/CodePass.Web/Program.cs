@@ -31,7 +31,7 @@ app.UseAntiforgery();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<CodePassDbContext>();
-    dbContext.Database.EnsureCreated();
+    await CodePassDatabaseInitializer.InitializeAsync(dbContext);
 }
 
 app.MapStaticAssets();
