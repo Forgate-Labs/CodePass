@@ -8,6 +8,8 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
     public DbSet<RegisteredSolution> RegisteredSolutions => Set<RegisteredSolution>();
     public DbSet<AuthoredRuleDefinition> AuthoredRuleDefinitions => Set<AuthoredRuleDefinition>();
     public DbSet<SolutionRuleAssignment> SolutionRuleAssignments => Set<SolutionRuleAssignment>();
+    public DbSet<RuleAnalysisRun> RuleAnalysisRuns => Set<RuleAnalysisRun>();
+    public DbSet<RuleAnalysisViolation> RuleAnalysisViolations => Set<RuleAnalysisViolation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,5 +54,41 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
             .IsRequired();
         solutionRuleAssignment.HasIndex(assignment => new { assignment.RegisteredSolutionId, assignment.AuthoredRuleDefinitionId })
             .IsUnique();
+
+        var ruleAnalysisRun = modelBuilder.Entity<RuleAnalysisRun>();
+
+        ruleAnalysisRun.HasKey(run => run.Id);
+        ruleAnalysisRun.Property(run => run.Status).HasConversion<string>().IsRequired();
+        ruleAnalysisRun.Property(run => run.RuleCount).IsRequired();
+        ruleAnalysisRun.Property(run => run.TotalViolations).IsRequired();
+        ruleAnalysisRun.Property(run => run.ErrorMessage);
+        ruleAnalysisRun.HasOne<RegisteredSolution>()
+            .WithMany()
+            .HasForeignKey(run => run.RegisteredSolutionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        ruleAnalysisRun.HasMany(run => run.Violations)
+            .WithOne(violation => violation.RuleAnalysisRun)
+            .HasForeignKey(violation => violation.RuleAnalysisRunId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        ruleAnalysisRun.HasIndex(run => run.RegisteredSolutionId);
+        ruleAnalysisRun.HasIndex(run => run.StartedAtUtc);
+
+        var ruleAnalysisViolation = modelBuilder.Entity<RuleAnalysisViolation>();
+
+        ruleAnalysisViolation.HasKey(violation => violation.Id);
+        ruleAnalysisViolation.Property(violation => violation.RuleCode).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.RuleTitle).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.RuleKind).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.RuleSeverity).HasConversion<string>().IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.Message).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.FilePath).IsRequired();
+        ruleAnalysisViolation.HasOne<AuthoredRuleDefinition>()
+            .WithMany()
+            .HasForeignKey(violation => violation.AuthoredRuleDefinitionId)
+            .OnDelete(DeleteBehavior.SetNull);
+        ruleAnalysisViolation.HasIndex(violation => violation.RuleAnalysisRunId);
+        ruleAnalysisViolation.HasIndex(violation => violation.RuleCode);
     }
 }
