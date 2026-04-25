@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-rule-analysis-review-04-PLAN.md
-last_updated: "2026-04-25T04:03:02.099Z"
-last_activity: 2026-04-25 — Completed plan 03-03 with persisted rule-analysis runs, grouped violation DTOs, and SQLite upgrade coverage.
+stopped_at: Completed 03-rule-analysis-review-05-PLAN.md
+last_updated: "2026-04-25T04:08:43.962Z"
+last_activity: 2026-04-25 — Completed plan 03-05 with the `/analysis/rules` UI, authored-rule toggles, manual run trigger, grouped results, and component coverage.
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 92
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 3 of 5 (Rule Analysis Review)
-Plan: 5 of 6 (next: 03-05-PLAN.md)
-Status: Phase 3 in progress; 03-04 complete
-Last activity: 2026-04-25 — Completed plan 03-04 with manual rule-analysis orchestration, scoped DI wiring, and run outcome coverage.
+Plan: 6 of 6 (next: 03-06-PLAN.md)
+Status: Phase 3 in progress; 03-05 complete
+Last activity: 2026-04-25 — Completed plan 03-05 with the `/analysis/rules` UI, authored-rule toggles, manual run trigger, grouped results, and component coverage.
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 19.9 min
-- Total execution time: 3.3 hours
+- Total plans completed: 11
+- Average duration: 18.4 min
+- Total execution time: 3.4 hours
 
 **By Phase:**
 
@@ -45,11 +45,11 @@ Progress: [████████░░] 83%
 |-------|-------|-------|----------|
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
 | 02-user-authored-rule-definitions | 3 | 125 min | 41.7 min |
-| 03-rule-analysis-review | 4 | 13 min | 3.3 min |
+| 03-rule-analysis-review | 5 | 16 min | 3.2 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-user-authored-rule-definitions-03 (1h 35m), 03-rule-analysis-review-01 (3 min), 03-rule-analysis-review-02 (5 min), 03-rule-analysis-review-03 (3 min), 03-rule-analysis-review-04 (2 min)
-- Trend: Phase 3 backend analysis foundations are moving quickly after Phase 2 checkpoint-heavy UI work.
+- Last 5 plans: 03-rule-analysis-review-01 (3 min), 03-rule-analysis-review-02 (5 min), 03-rule-analysis-review-03 (3 min), 03-rule-analysis-review-04 (2 min), 03-rule-analysis-review-05 (3 min)
+- Trend: Phase 3 backend and UI rule-analysis work is moving quickly after Phase 2 checkpoint-heavy UI work.
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
@@ -60,6 +60,7 @@ Progress: [████████░░] 83%
 | Phase 03-rule-analysis-review P02 | 5 min | 3 tasks | 5 files |
 | Phase 03-rule-analysis-review P03 | 3 min | 3 tasks | 11 files |
 | Phase 03-rule-analysis-review P04 | 2 min | 3 tasks | 4 files |
+| Phase 03-rule-analysis-review P05 | 3 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,9 @@ Recent decisions affecting current work:
 - [Phase 03-rule-analysis-review]: Keep RuleAnalysisResultService persistence-focused; orchestration and Roslyn execution remain separate concerns for Plan 03-04.
 - [Phase 03-rule-analysis-review]: Manual rule-analysis execution is exposed through a scoped IRuleAnalysisRunService so UI callers do not compose selection, analyzer, and result persistence services directly. — Plan 03-05 needs a single backend operation for the /analysis/rules UI, and this keeps orchestration separate from persistence and Roslyn execution concerns.
 - [Phase 03-rule-analysis-review]: Valid registered solutions with no enabled authored rules complete as succeeded zero-rule runs without invoking the analyzer. — Empty per-solution rule selections are a legitimate user state and should leave durable successful run records instead of surfacing analyzer errors.
+- [Phase 03-rule-analysis-review]: Keep rule-analysis selection, manual runs, and latest results together on `/analysis/rules` so users can review one selected solution without navigating between pages.
+- [Phase 03-rule-analysis-review]: Render rule applicability exclusively from `ISolutionRuleSelectionService` results so catalog metadata never appears as selectable production rules.
+- [Phase 03-rule-analysis-review]: Use Bootstrap-native cards, badges, switches, and alerts with stable `data-testid` selectors for maintainable Blazor component tests.
 
 ### Pending Todos
 
@@ -109,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-25T04:03:02.097Z
-Stopped at: Completed 03-rule-analysis-review-04-PLAN.md
+Last session: 2026-04-25T04:08:43.960Z
+Stopped at: Completed 03-rule-analysis-review-05-PLAN.md
 Resume file: None
