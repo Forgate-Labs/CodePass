@@ -43,7 +43,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 02-01-PLAN.md — Add authored-rule persistence, the closed rule-kind catalog, and authored-only active-rule services.
-- [ ] 02-02-PLAN.md — Build the `/rules` page, authored-rule listing UI, and schema-driven editor flow.
+- [x] 02-02-PLAN.md — Build the `/rules` page, authored-rule listing UI, and schema-driven editor flow.
 - [ ] 02-03-PLAN.md — Add raw JSON editing, JSON validation, and final `/rules` workflow verification.
 
 ### Phase 3: Rule Analysis Review
@@ -109,7 +109,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
-| 2. User-Authored Rule Definitions | 1/3 | In Progress | - |
+| 2. User-Authored Rule Definitions | 2/3 | In Progress | - |
 | 3. Rule Analysis Review | 0/TBD | Not started | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |

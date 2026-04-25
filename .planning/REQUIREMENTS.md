@@ -12,7 +12,7 @@
 ### Rules
 
 - [ ] **RULE-01**: User can manually start a rule-analysis run for a registered solution.
-- [ ] **RULE-02**: User can create a custom rule from scratch through a schema-driven editor backed by the rule DSL.
+- [x] **RULE-02**: User can create a custom rule from scratch through a schema-driven editor backed by the rule DSL.
 - [ ] **RULE-03**: User can edit a custom rule as raw JSON when they need direct control over the DSL.
 - [ ] **RULE-04**: User can enable or disable a custom rule per registered solution.
 - [ ] **RULE-05**: User can review rule-analysis results grouped by rule.
@@ -56,7 +56,7 @@
 | PROJ-02 | Phase 1 - Registered Solutions | Complete |
 | PROJ-03 | Phase 1 - Registered Solutions | Complete |
 | PROJ-04 | Phase 1 - Registered Solutions | Complete |
-| RULE-02 | Phase 2 - User-Authored Rule Definitions | Pending |
+| RULE-02 | Phase 2 - User-Authored Rule Definitions | Complete |
 | RULE-03 | Phase 2 - User-Authored Rule Definitions | Pending |
 | RULE-07 | Phase 2 - User-Authored Rule Definitions | Complete |
 | RULE-01 | Phase 3 - Rule Analysis Review | Pending |

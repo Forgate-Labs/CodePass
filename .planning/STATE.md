@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-04-25T01:33:29Z"
-last_activity: 2026-04-25 — Completed plan 02-01 with authored rule persistence, the closed catalog, and authored-only service coverage.
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-04-25T01:44:30Z"
+last_activity: 2026-04-25 — Completed plan 02-02 with the /rules page, schema-driven authored-rule editor, and component coverage.
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -26,33 +26,34 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 2 of 5 (User-Authored Rule Definitions)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-04-25 — Completed plan 02-01 with authored rule persistence, the closed catalog, and authored-only service coverage.
+Last activity: 2026-04-25 — Completed plan 02-02 with the /rules page, schema-driven authored-rule editor, and component coverage.
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 17.2 min
-- Total execution time: 1.2 hours
+- Total plans completed: 5
+- Average duration: 18.2 min
+- Total execution time: 1.5 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
-| 02-user-authored-rule-definitions | 1 | 8 min | 8.0 min |
+| 02-user-authored-rule-definitions | 2 | 30 min | 15.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-registered-solutions-01 (31 min), 01-registered-solutions-02 (10 min), 01-registered-solutions-03 (20 min), 02-user-authored-rule-definitions-01 (8 min)
+- Last 5 plans: 01-registered-solutions-01 (31 min), 01-registered-solutions-02 (10 min), 01-registered-solutions-03 (20 min), 02-user-authored-rule-definitions-01 (8 min), 02-user-authored-rule-definitions-02 (22 min)
 - Trend: Stable
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
 | Phase 02 P01 | 8 min | 3 tasks | 11 files |
+| Phase 02 P02 | 22 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 01-registered-solutions]: The full /solutions flow was accepted through a human verification checkpoint after a follow-up bug-fix clarified the picker-assisted add experience. — This records the approved checkpoint outcome and the small UX fix needed to satisfy live verification.
 - [Phase 02]: Keep rule-kind metadata in a closed in-code catalog so the UI can render supported schemas without turning catalog entries into active rules. — Separates engine-supported authoring metadata from persisted authored rules and preserves the authored-only v1 constraint.
 - [Phase 02]: Persist scope, parameters, and raw DSL documents as normalized JSON strings to stay SQLite-friendly and deterministic in tests. — String-backed JSON keeps storage provider-agnostic for SQLite while giving the UI and later execution phases stable serialized payloads.
+- [Phase 02]: Keep the /rules screen authored-rule-only and use the catalog exclusively as editor metadata so supported kinds never appear as pseudo-rules. — This preserves the v1 constraint that active rules are always user-authored while still letting the editor use closed catalog metadata.
+- [Phase 02]: Represent schema array fields as newline-based string-list inputs so catalog-backed defaults stay editable with standard Bootstrap controls. — This keeps the UI simple, avoids a new component library, and still supports editable list defaults for rule kinds.
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-25T01:32:31.341Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-04-25T01:44:30.341Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
