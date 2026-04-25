@@ -1,0 +1,48 @@
+@using CodePass.Web.Services.Rules
+
+<div class="card h-100 shadow-sm border-0" data-testid="rule-card">
+    <div class="card-body d-flex flex-column gap-3">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+            <div>
+                <div class="text-body-secondary small text-uppercase fw-semibold" data-testid="rule-code">@Rule.Code</div>
+                <h2 class="h5 mb-1" data-testid="rule-title">@Rule.Title</h2>
+                <p class="text-body-secondary mb-0">@Rule.RuleKind</p>
+            </div>
+
+            <span class="badge @GetEnabledBadgeClass(Rule.IsEnabled)" data-testid="rule-enabled">@(Rule.IsEnabled ? "Enabled" : "Disabled")</span>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Rule.Description))
+        {
+            <p class="mb-0" data-testid="rule-description">@Rule.Description</p>
+        }
+
+        <dl class="row mb-0 small">
+            <dt class="col-sm-4 text-body-secondary">Severity</dt>
+            <dd class="col-sm-8 mb-2" data-testid="rule-severity">@Rule.Severity</dd>
+
+            <dt class="col-sm-4 text-body-secondary">Schema</dt>
+            <dd class="col-sm-8 mb-2">@Rule.SchemaVersion</dd>
+
+            <dt class="col-sm-4 text-body-secondary">Last updated</dt>
+            <dd class="col-sm-8 mb-0" data-testid="rule-updated">@Rule.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
+        </dl>
+    </div>
+
+    <div class="card-footer bg-transparent border-0 pt-0 pb-3 px-3 d-flex justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="button" data-testid="edit-rule-button" @onclick="() => OnEdit.InvokeAsync(Rule)">
+            Edit rule
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public AuthoredRuleDefinitionDto Rule { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<AuthoredRuleDefinitionDto> OnEdit { get; set; }
+
+    private static string GetEnabledBadgeClass(bool isEnabled)
+        => isEnabled ? "text-bg-success" : "text-bg-secondary";
+}

@@ -1,0 +1,83 @@
+@page "/rules"
+@using CodePass.Web.Components.Rules
+@using CodePass.Web.Services.Rules
+@inject IRuleDefinitionService RuleDefinitionService
+
+<PageTitle>Authored Rules</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">Authored Rules</h1>
+            <p class="text-body-secondary mb-0">Review the user-authored rules currently stored in CodePass. Supported rule kinds stay behind the authoring workflow and are never listed here as pseudo-rules.</p>
+        </div>
+
+        <button class="btn btn-primary align-self-start" type="button" disabled data-testid="create-rule-button">
+            New authored rule
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(LoadError))
+    {
+        <div class="alert alert-danger" role="alert" data-testid="rules-load-error">@LoadError</div>
+    }
+
+    @if (IsLoading)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p class="mb-0 text-body-secondary">Loading authored rules...</p>
+            </div>
+        </div>
+    }
+    else if (Rules.Count == 0)
+    {
+        <div class="card shadow-sm border-0" data-testid="rules-empty-state">
+            <div class="card-body p-4 text-center">
+                <h2 class="h4 mb-2">No authored rules yet</h2>
+                <p class="text-body-secondary mb-3">CodePass v1 exposes only the rules you author. No shipped production rule packs are shown in this management view.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3" data-testid="rules-list">
+            @foreach (var rule in Rules)
+            {
+                <div class="col-12 col-xl-6" data-testid="rule-card-item">
+                    <RuleDefinitionCard Rule="rule" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private string? LoadError { get; set; }
+    private IReadOnlyList<AuthoredRuleDefinitionDto> Rules { get; set; } = Array.Empty<AuthoredRuleDefinitionDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRulesAsync();
+    }
+
+    private async Task LoadRulesAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            LoadError = null;
+            Rules = await RuleDefinitionService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            LoadError = $"Unable to load authored rules: {ex.Message}";
+            Rules = Array.Empty<AuthoredRuleDefinitionDto>();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}
