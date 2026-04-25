@@ -1,0 +1,158 @@
+@using CodePass.Web.Data.Entities
+@using CodePass.Web.Services.RuleAnalysis
+@inject ISolutionRuleSelectionService SolutionRuleSelectionService
+
+<section class="card shadow-sm border-0" aria-labelledby="rule-selection-heading" data-testid="solution-rule-selection-panel">
+    <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h4 mb-1" id="rule-selection-heading">Authored rules for @SolutionName</h2>
+                <p class="text-body-secondary mb-0">Enable only the user-authored rules that should run for this solution. Catalog entries are not shown here.</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(LoadError))
+        {
+            <div class="alert alert-danger" role="alert" data-testid="rule-selection-error">@LoadError</div>
+        }
+
+        @if (IsLoading)
+        {
+            <p class="text-body-secondary mb-0" data-testid="rule-selection-loading">Loading authored-rule selections...</p>
+        }
+        else if (Selections.Count == 0)
+        {
+            <div class="border rounded-3 p-4 text-center" data-testid="rule-selection-empty-state">
+                <h3 class="h5 mb-2">No authored rules available</h3>
+                <p class="text-body-secondary mb-0">Create user-authored rules before enabling analysis for this solution.</p>
+            </div>
+        }
+        else
+        {
+            <div class="list-group list-group-flush" data-testid="rule-selection-list">
+                @foreach (var selection in Selections)
+                {
+                    var inputId = $"rule-selection-{selection.RuleId:N}";
+                    <div class="list-group-item px-0 py-3" data-testid="rule-selection-row">
+                        <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
+                            <div class="flex-grow-1">
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                    <span class="text-body-secondary small text-uppercase fw-semibold" data-testid="rule-selection-code">@selection.RuleCode</span>
+                                    <span class="badge @GetSeverityBadgeClass(selection.Severity)" data-testid="rule-selection-severity">@selection.Severity</span>
+                                    @if (!selection.IsGloballyEnabled)
+                                    {
+                                        <span class="badge text-bg-secondary" data-testid="rule-selection-unavailable">Globally disabled</span>
+                                    }
+                                </div>
+                                <h3 class="h5 mb-1" data-testid="rule-selection-title">@selection.Title</h3>
+                                <p class="text-body-secondary mb-0" data-testid="rule-selection-kind">@selection.RuleKind</p>
+                            </div>
+
+                            <div class="form-check form-switch pt-lg-1">
+                                <input class="form-check-input"
+                                       id="@inputId"
+                                       type="checkbox"
+                                       role="switch"
+                                       checked="@selection.IsEnabledForSolution"
+                                       disabled="@(!selection.IsGloballyEnabled || SavingRuleIds.Contains(selection.RuleId))"
+                                       @onchange="args => SetRuleEnabledAsync(selection, args)"
+                                       data-testid="rule-selection-switch" />
+                                <label class="form-check-label" for="@inputId">
+                                    @(selection.IsEnabledForSolution ? "Enabled" : "Disabled")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid RegisteredSolutionId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string SolutionName { get; set; } = string.Empty;
+
+    private bool IsLoading { get; set; }
+    private string? LoadError { get; set; }
+    private Guid? LoadedSolutionId { get; set; }
+    private List<SolutionRuleSelectionDto> Selections { get; set; } = [];
+    private HashSet<Guid> SavingRuleIds { get; } = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LoadedSolutionId == RegisteredSolutionId)
+        {
+            return;
+        }
+
+        LoadedSolutionId = RegisteredSolutionId;
+        await LoadSelectionsAsync();
+    }
+
+    private async Task LoadSelectionsAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            LoadError = null;
+            Selections = (await SolutionRuleSelectionService.GetSelectionsAsync(RegisteredSolutionId)).ToList();
+        }
+        catch (Exception ex)
+        {
+            LoadError = $"Unable to load authored-rule selections: {ex.Message}";
+            Selections = [];
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SetRuleEnabledAsync(SolutionRuleSelectionDto selection, ChangeEventArgs args)
+    {
+        if (!selection.IsGloballyEnabled)
+        {
+            return;
+        }
+
+        var isEnabled = args.Value is bool boolValue && boolValue;
+
+        try
+        {
+            LoadError = null;
+            SavingRuleIds.Add(selection.RuleId);
+            await SolutionRuleSelectionService.SetRuleEnabledAsync(new SetSolutionRuleSelectionRequest(RegisteredSolutionId, selection.RuleId, isEnabled));
+
+            var index = Selections.FindIndex(item => item.RuleId == selection.RuleId);
+            if (index >= 0)
+            {
+                Selections[index] = selection with
+                {
+                    IsEnabledForSolution = isEnabled,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            LoadError = $"Unable to update rule selection: {ex.Message}";
+        }
+        finally
+        {
+            SavingRuleIds.Remove(selection.RuleId);
+        }
+    }
+
+    private static string GetSeverityBadgeClass(RuleSeverity severity)
+        => severity switch
+        {
+            RuleSeverity.Error => "text-bg-danger",
+            RuleSeverity.Warning => "text-bg-warning",
+            RuleSeverity.Info => "text-bg-info",
+            _ => "text-bg-secondary"
+        };
+}
