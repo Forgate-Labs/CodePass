@@ -34,7 +34,8 @@ public sealed record SaveAuthoredRuleDefinitionRequest(
     RuleSeverity Severity,
     string ScopeJson,
     string ParametersJson,
-    bool IsEnabled);
+    bool IsEnabled,
+    string? RawDefinitionJson = null);
 
 public sealed record AuthoredRuleDefinitionDto(
     Guid Id,
