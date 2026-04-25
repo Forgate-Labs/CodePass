@@ -1,5 +1,6 @@
 using CodePass.Web.Components;
 using CodePass.Web.Data;
+using CodePass.Web.Services.Rules;
 using CodePass.Web.Services.Solutions;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,8 @@ builder.Services.AddDbContext<CodePassDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("CodePass")));
 builder.Services.AddScoped<ISolutionPathValidator, SolutionPathValidator>();
 builder.Services.AddScoped<IRegisteredSolutionService, RegisteredSolutionService>();
+builder.Services.AddScoped<IRuleCatalogService, RuleCatalogService>();
+builder.Services.AddScoped<IRuleDefinitionService, RuleDefinitionService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
