@@ -83,6 +83,8 @@ public sealed class CodePassDatabaseInitializerTests
             tableNames.Should().Contain("RegisteredSolutions");
             tableNames.Should().Contain("AuthoredRuleDefinitions");
             tableNames.Should().Contain("SolutionRuleAssignments");
+            tableNames.Should().Contain("RuleAnalysisRuns");
+            tableNames.Should().Contain("RuleAnalysisViolations");
 
             (await dbContext.RegisteredSolutions.CountAsync()).Should().Be(1);
             (await dbContext.AuthoredRuleDefinitions.CountAsync()).Should().Be(1);
@@ -97,9 +99,39 @@ public sealed class CodePassDatabaseInitializerTests
                 UpdatedAtUtc = DateTimeOffset.UtcNow
             });
 
+            var analysisRun = new RuleAnalysisRun
+            {
+                Id = Guid.NewGuid(),
+                RegisteredSolutionId = existingSolutionId,
+                Status = RuleAnalysisRunStatus.Succeeded,
+                StartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                CompletedAtUtc = DateTimeOffset.UtcNow,
+                RuleCount = 1,
+                TotalViolations = 1
+            };
+            dbContext.RuleAnalysisRuns.Add(analysisRun);
+            dbContext.RuleAnalysisViolations.Add(new RuleAnalysisViolation
+            {
+                Id = Guid.NewGuid(),
+                RuleAnalysisRunId = analysisRun.Id,
+                AuthoredRuleDefinitionId = existingRuleId,
+                RuleCode = "CP3000",
+                RuleTitle = "Existing authored rule",
+                RuleKind = "syntax_presence",
+                RuleSeverity = RuleSeverity.Error,
+                Message = "Use explicit type instead of var.",
+                FilePath = "src/Legacy.cs",
+                StartLine = 10,
+                StartColumn = 5,
+                EndLine = 10,
+                EndColumn = 8
+            });
+
             await dbContext.SaveChangesAsync();
 
             (await dbContext.SolutionRuleAssignments.CountAsync()).Should().Be(1);
+            (await dbContext.RuleAnalysisRuns.CountAsync()).Should().Be(1);
+            (await dbContext.RuleAnalysisViolations.CountAsync()).Should().Be(1);
             var existingSolution = await dbContext.RegisteredSolutions.SingleAsync();
             existingSolution.DisplayName.Should().Be("Legacy solution with authored rules");
             var existingRule = await dbContext.AuthoredRuleDefinitions.SingleAsync();
