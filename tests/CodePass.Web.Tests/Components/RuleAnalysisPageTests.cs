@@ -29,6 +29,25 @@ public sealed class RuleAnalysisPageTests : TestContext
     }
 
     [Fact]
+    public void SelectedSolution_ShouldRenderDisplayNameInAuthoredRulesHeading()
+    {
+        var solution = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+
+        Services.AddSingleton<IRegisteredSolutionService>(new RuleAnalysisTestRegisteredSolutionService(solution));
+        Services.AddSingleton<ISolutionRuleSelectionService>(new RuleAnalysisTestSelectionService());
+        Services.AddSingleton<IRuleAnalysisRunService>(new RuleAnalysisTestRunService());
+        Services.AddSingleton<IRuleAnalysisResultService>(new RuleAnalysisTestResultService());
+
+        var cut = RenderComponent<RuleAnalysis>();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Authored rules for Alpha");
+            cut.Markup.Should().NotContain("Authored rules for SelectedSolution.DisplayName");
+        });
+    }
+
+    [Fact]
     public async Task SelectingSolution_ShouldLoadPerSolutionAuthoredRuleSelections()
     {
         var alpha = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
