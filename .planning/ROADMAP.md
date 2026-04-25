@@ -11,7 +11,7 @@ CodePass v1 moves from trusted local solution registration, to user-authored rul
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Registered Solutions** - Users can register, inspect, and maintain the local `.sln` targets CodePass analyzes.
-- [ ] **Phase 2: User-Authored Rule Definitions** - Admin users can create and edit only user-authored rules through the DSL-backed rule editor.
+- [x] **Phase 2: User-Authored Rule Definitions** - Admin users can create and edit only user-authored rules through the DSL-backed rule editor.
 - [ ] **Phase 3: Rule Analysis Review** - Users can apply authored rules to solutions, run analysis manually, and inspect actionable findings.
 - [ ] **Phase 4: Coverage Analysis Review** - Users can run coverage analysis manually and inspect normalized coverage results.
 - [ ] **Phase 5: Quality Score Dashboard** - Users can understand the current pass/fail state and score from rule and coverage evidence.
@@ -44,7 +44,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Add authored-rule persistence, the closed rule-kind catalog, and authored-only active-rule services.
 - [x] 02-02-PLAN.md — Build the `/rules` page, authored-rule listing UI, and schema-driven editor flow.
-- [ ] 02-03-PLAN.md — Add raw JSON editing, JSON validation, and final `/rules` workflow verification.
+- [x] 02-03-PLAN.md — Add raw JSON editing, JSON validation, and final `/rules` workflow verification.
 
 ### Phase 3: Rule Analysis Review
 **Goal**: Users can decide which authored rules apply to each solution, run rule analysis on demand, and inspect violations clearly.
@@ -109,7 +109,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
-| 2. User-Authored Rule Definitions | 2/3 | In Progress | - |
+| 2. User-Authored Rule Definitions | 3/3 | Complete | 2026-04-25 |
 | 3. Rule Analysis Review | 0/TBD | Not started | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |
