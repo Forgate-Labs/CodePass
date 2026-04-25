@@ -1,7 +1,9 @@
+using System.Data.Common;
 using CodePass.Web.Data;
 using CodePass.Web.Data.Entities;
 using CodePass.Web.Services.RuleAnalysis;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace CodePass.Web.Tests.Services;
@@ -36,6 +38,26 @@ public sealed class RuleAnalysisResultServiceTests
         latestSolutionB.Should().NotBeNull();
         latestSolutionB!.Id.Should().Be(solutionBRun.Id);
         latestSolutionB.RegisteredSolutionId.Should().Be(fixture.SolutionB.Id);
+    }
+
+    [Fact]
+    public async Task GetLatestRunForSolutionAsync_ShouldOrderRunsWithSqliteProvider()
+    {
+        await using var fixture = await RuleAnalysisResultServiceFixture.CreateSqliteAsync();
+        var baseTime = DateTimeOffset.UtcNow.AddMinutes(-10);
+
+        var olderRun = await fixture.Service.CreateRunningRunAsync(fixture.SolutionA.Id, ruleCount: 1);
+        await SetStartedAtAsync(fixture.DbContext, olderRun.Id, baseTime);
+        await fixture.Service.MarkSucceededAsync(olderRun.Id, []);
+
+        var newestRun = await fixture.Service.CreateRunningRunAsync(fixture.SolutionA.Id, ruleCount: 1);
+        await SetStartedAtAsync(fixture.DbContext, newestRun.Id, baseTime.AddMinutes(5));
+        await fixture.Service.MarkSucceededAsync(newestRun.Id, []);
+
+        var latestRun = await fixture.Service.GetLatestRunForSolutionAsync(fixture.SolutionA.Id);
+
+        latestRun.Should().NotBeNull();
+        latestRun!.Id.Should().Be(newestRun.Id);
     }
 
     [Fact]
@@ -127,7 +149,8 @@ internal sealed class RuleAnalysisResultServiceFixture : IAsyncDisposable
         RegisteredSolution solutionA,
         RegisteredSolution solutionB,
         AuthoredRuleDefinition errorRule,
-        AuthoredRuleDefinition warningRule)
+        AuthoredRuleDefinition warningRule,
+        DbConnection? dbConnection = null)
     {
         DbContext = dbContext;
         Service = service;
@@ -135,6 +158,7 @@ internal sealed class RuleAnalysisResultServiceFixture : IAsyncDisposable
         SolutionB = solutionB;
         ErrorRule = errorRule;
         WarningRule = warningRule;
+        DbConnection = dbConnection;
     }
 
     public CodePassDbContext DbContext { get; }
@@ -148,6 +172,8 @@ internal sealed class RuleAnalysisResultServiceFixture : IAsyncDisposable
     public AuthoredRuleDefinition ErrorRule { get; }
 
     public AuthoredRuleDefinition WarningRule { get; }
+
+    private DbConnection? DbConnection { get; }
 
     public static async Task<RuleAnalysisResultServiceFixture> CreateAsync()
     {
@@ -177,6 +203,38 @@ internal sealed class RuleAnalysisResultServiceFixture : IAsyncDisposable
             warningRule);
     }
 
+    public static async Task<RuleAnalysisResultServiceFixture> CreateSqliteAsync()
+    {
+        var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<CodePassDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        var dbContext = new CodePassDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        var solutionA = CreateSolution("Solution A", "/tmp/solution-a.sln", now);
+        var solutionB = CreateSolution("Solution B", "/tmp/solution-b.sln", now);
+        var errorRule = CreateRule("CP2000", "Avoid console writes", RuleSeverity.Error, now);
+        var warningRule = CreateRule("CP2001", "Avoid var", RuleSeverity.Warning, now);
+
+        dbContext.RegisteredSolutions.AddRange(solutionA, solutionB);
+        dbContext.AuthoredRuleDefinitions.AddRange(errorRule, warningRule);
+        await dbContext.SaveChangesAsync();
+
+        return new RuleAnalysisResultServiceFixture(
+            dbContext,
+            new RuleAnalysisResultService(dbContext),
+            solutionA,
+            solutionB,
+            errorRule,
+            warningRule,
+            connection);
+    }
+
     public RuleAnalysisFinding CreateFinding(
         AuthoredRuleDefinition rule,
         string relativeFilePath,
@@ -197,6 +255,11 @@ internal sealed class RuleAnalysisResultServiceFixture : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await DbContext.DisposeAsync();
+
+        if (DbConnection is not null)
+        {
+            await DbConnection.DisposeAsync();
+        }
     }
 
     private static RegisteredSolution CreateSolution(string displayName, string solutionPath, DateTimeOffset now) => new()

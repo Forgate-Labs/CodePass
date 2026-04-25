@@ -119,15 +119,18 @@ public sealed class RuleAnalysisResultService(CodePassDbContext dbContext) : IRu
         Guid registeredSolutionId,
         CancellationToken cancellationToken = default)
     {
-        var run = await dbContext.RuleAnalysisRuns
+        var runs = await dbContext.RuleAnalysisRuns
             .AsNoTracking()
             .Include(existing => existing.Violations)
             .Where(existing => existing.RegisteredSolutionId == registeredSolutionId)
+            .ToListAsync(cancellationToken);
+
+        var latestRun = runs
             .OrderByDescending(existing => existing.StartedAtUtc)
             .ThenByDescending(existing => existing.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefault();
 
-        return run is null ? null : MapRun(run);
+        return latestRun is null ? null : MapRun(latestRun);
     }
 
     private async Task<RuleAnalysisRun> GetTrackedRunAsync(Guid runId, CancellationToken cancellationToken)
