@@ -79,6 +79,72 @@ public sealed class RuleDefinitionsPageTests : TestContext
             cut.Markup.Should().Contain("Avoid var");
         });
     }
+
+    [Fact]
+    public async Task SavingJsonEditedRule_ShouldRefreshListAndKeepAuthoredOnlyCopy()
+    {
+        var existingRule = FakeRuleDefinitionService.CreateRule(
+            code: "CP1001",
+            title: "Avoid var",
+            kind: "syntax_presence",
+            severity: RuleSeverity.Warning,
+            parametersJson: JsonSerializer.Serialize(new Dictionary<string, object?>
+            {
+                ["mode"] = "forbid",
+                ["targets"] = new[] { "local_declaration" },
+                ["syntaxKinds"] = new[] { "var" },
+                ["allowInTests"] = false
+            }));
+
+        var ruleService = new FakeRuleDefinitionService(existingRule);
+        Services.AddSingleton<IRuleDefinitionService>(ruleService);
+        Services.AddSingleton<IRuleCatalogService>(new FakeRuleCatalogService());
+
+        var cut = RenderComponent<RuleDefinitions>();
+
+        await cut.Find("button[data-testid='edit-rule-button']").ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='json-mode-button']").ClickAsync(new MouseEventArgs());
+
+        var editedJson = JsonSerializer.Serialize(new
+        {
+            id = "CP1001",
+            title = "Avoid goto",
+            description = "Updated through raw json",
+            kind = "syntax_presence",
+            schemaVersion = "1.0",
+            severity = "error",
+            enabled = true,
+            language = "csharp",
+            scope = new
+            {
+                projects = new[] { "*" },
+                files = new[] { "**/*.cs" },
+                excludeFiles = Array.Empty<string>()
+            },
+            parameters = new
+            {
+                mode = "forbid",
+                targets = new[] { "member_access" },
+                syntaxKinds = new[] { "goto" },
+                allowInTests = false
+            }
+        }, new JsonSerializerOptions { WriteIndented = true });
+
+        await cut.Find("[data-testid='rule-raw-json-input']").ChangeAsync(new ChangeEventArgs { Value = editedJson });
+        await cut.Find("form").SubmitAsync();
+
+        cut.WaitForAssertion(() =>
+        {
+            ruleService.UpdateCalls.Should().Be(1);
+            ruleService.GetAllCalls.Should().BeGreaterThanOrEqualTo(2);
+            cut.Markup.Should().Contain("Avoid goto");
+            cut.Markup.Should().NotContain("Syntax presence policy");
+            cut.Markup.Should().NotContain("Forbidden API usage");
+            cut.Markup.Should().NotContain("Symbol naming policy");
+            ruleService.UpdatedRequests[0].Request.RawDefinitionJson.Should().NotBeNull();
+            ruleService.UpdatedRequests[0].Request.RawDefinitionJson.Should().Contain("\"syntaxKinds\"");
+        });
+    }
 }
 
 internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto[] seededRules) : IRuleDefinitionService
@@ -105,7 +171,7 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
     {
         CreateCalls++;
         CreatedRequests.Add(request);
-        var created = CreateRule(request.Code, request.Title, request.RuleKind, request.Severity, request.Description, request.IsEnabled, request.ScopeJson, request.ParametersJson, request.SchemaVersion);
+        var created = CreateRule(request.Code, request.Title, request.RuleKind, request.Severity, request.Description, request.IsEnabled, request.ScopeJson, request.ParametersJson, request.SchemaVersion, rawDefinitionJson: request.RawDefinitionJson);
         _rules.Add(created);
         return Task.FromResult(created);
     }
@@ -121,7 +187,7 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
             throw new KeyNotFoundException($"Rule '{id}' not found.");
         }
 
-        _rules[index] = CreateRule(request.Code, request.Title, request.RuleKind, request.Severity, request.Description, request.IsEnabled, request.ScopeJson, request.ParametersJson, request.SchemaVersion, id);
+        _rules[index] = CreateRule(request.Code, request.Title, request.RuleKind, request.Severity, request.Description, request.IsEnabled, request.ScopeJson, request.ParametersJson, request.SchemaVersion, id, request.RawDefinitionJson);
         return Task.FromResult(_rules[index]);
     }
 
@@ -144,7 +210,8 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
         string? scopeJson = null,
         string? parametersJson = null,
         string schemaVersion = "1.0",
-        Guid? id = null)
+        Guid? id = null,
+        string? rawDefinitionJson = null)
     {
         var now = DateTimeOffset.UtcNow;
         scopeJson ??= JsonSerializer.Serialize(new Dictionary<string, object?>
@@ -154,6 +221,20 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
             ["excludeFiles"] = Array.Empty<string>()
         });
         parametersJson ??= JsonSerializer.Serialize(new Dictionary<string, object?>());
+
+        rawDefinitionJson ??= JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["id"] = code,
+            ["title"] = title,
+            ["description"] = description,
+            ["kind"] = kind,
+            ["schemaVersion"] = schemaVersion,
+            ["severity"] = severity.ToString().ToLowerInvariant(),
+            ["enabled"] = isEnabled,
+            ["language"] = "csharp",
+            ["scope"] = JsonSerializer.Deserialize<JsonElement>(scopeJson),
+            ["parameters"] = JsonSerializer.Deserialize<JsonElement>(parametersJson)
+        });
 
         return new AuthoredRuleDefinitionDto(
             id ?? Guid.NewGuid(),
@@ -165,7 +246,7 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
             severity,
             scopeJson,
             parametersJson,
-            "{}",
+            rawDefinitionJson,
             isEnabled,
             now,
             now);
