@@ -6,6 +6,7 @@ using CodePass.Web.Services.Solutions;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseStaticWebAssets();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
