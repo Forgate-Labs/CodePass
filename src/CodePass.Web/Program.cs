@@ -18,7 +18,9 @@ builder.Services.AddScoped<IRegisteredSolutionService, RegisteredSolutionService
 builder.Services.AddScoped<IRuleCatalogService, RuleCatalogService>();
 builder.Services.AddScoped<IRuleDefinitionService, RuleDefinitionService>();
 builder.Services.AddScoped<ISolutionRuleSelectionService, SolutionRuleSelectionService>();
+builder.Services.AddScoped<IRuleAnalyzer, RoslynRuleAnalyzer>();
 builder.Services.AddScoped<IRuleAnalysisResultService, RuleAnalysisResultService>();
+builder.Services.AddScoped<IRuleAnalysisRunService, RuleAnalysisRunService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
