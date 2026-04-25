@@ -4,6 +4,8 @@
 @using CodePass.Web.Services.RuleAnalysis
 @using CodePass.Web.Services.Solutions
 @inject IRegisteredSolutionService RegisteredSolutionService
+@inject IRuleAnalysisRunService RuleAnalysisRunService
+@inject IRuleAnalysisResultService RuleAnalysisResultService
 
 <PageTitle>Rule Analysis</PageTitle>
 
@@ -13,11 +15,24 @@
             <h1 class="mb-1">Rule Analysis</h1>
             <p class="text-body-secondary mb-0">Choose a registered solution, enable the authored rules that apply, and review manual analysis results.</p>
         </div>
+
+        <button class="btn btn-primary align-self-start"
+                type="button"
+                disabled="@(SelectedSolution is null || IsRunInProgress)"
+                @onclick="StartRuleAnalysisAsync"
+                data-testid="run-rule-analysis-button">
+            @(IsRunInProgress ? "Running analysis..." : "Run rule analysis")
+        </button>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(LoadError))
     {
         <div class="alert alert-danger" role="alert" data-testid="rule-analysis-load-error">@LoadError</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(RunError))
+    {
+        <div class="alert alert-danger" role="alert" data-testid="rule-analysis-run-error">@RunError</div>
     }
 
     @if (IsLoadingSolutions)
@@ -85,15 +100,37 @@
         }
         else
         {
-            <SolutionRuleSelectionPanel RegisteredSolutionId="SelectedSolution.Id" SolutionName="SelectedSolution.DisplayName" />
+            <div class="row g-4">
+                <div class="col-12 col-xxl-5">
+                    <SolutionRuleSelectionPanel RegisteredSolutionId="SelectedSolution.Id" SolutionName="SelectedSolution.DisplayName" />
+                </div>
+                <div class="col-12 col-xxl-7">
+                    @if (IsLoadingLatestRun)
+                    {
+                        <div class="card shadow-sm border-0" data-testid="rule-analysis-results-loading">
+                            <div class="card-body">
+                                <p class="mb-0 text-body-secondary">Loading latest rule-analysis results...</p>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <RuleAnalysisResults Run="LatestRun" />
+                    }
+                </div>
+            </div>
         }
     }
 </div>
 
 @code {
     private bool IsLoadingSolutions { get; set; } = true;
+    private bool IsLoadingLatestRun { get; set; }
+    private bool IsRunInProgress { get; set; }
     private string? LoadError { get; set; }
+    private string? RunError { get; set; }
     private RegisteredSolution? SelectedSolution { get; set; }
+    private RuleAnalysisRunDto? LatestRun { get; set; }
     private IReadOnlyList<RegisteredSolution> Solutions { get; set; } = Array.Empty<RegisteredSolution>();
 
     protected override async Task OnInitializedAsync()
@@ -115,17 +152,73 @@
             LoadError = $"Unable to load registered solutions: {ex.Message}";
             Solutions = Array.Empty<RegisteredSolution>();
             SelectedSolution = null;
+            LatestRun = null;
         }
         finally
         {
             IsLoadingSolutions = false;
         }
+
+        if (SelectedSolution is not null)
+        {
+            await LoadLatestRunAsync(SelectedSolution.Id);
+        }
     }
 
-    private Task SelectSolutionAsync(Guid solutionId)
+    private async Task SelectSolutionAsync(Guid solutionId)
     {
         SelectedSolution = Solutions.SingleOrDefault(solution => solution.Id == solutionId);
-        return Task.CompletedTask;
+        RunError = null;
+
+        if (SelectedSolution is null)
+        {
+            LatestRun = null;
+            return;
+        }
+
+        await LoadLatestRunAsync(SelectedSolution.Id);
+    }
+
+    private async Task LoadLatestRunAsync(Guid solutionId)
+    {
+        try
+        {
+            IsLoadingLatestRun = true;
+            RunError = null;
+            LatestRun = await RuleAnalysisResultService.GetLatestRunForSolutionAsync(solutionId);
+        }
+        catch (Exception ex)
+        {
+            LatestRun = null;
+            RunError = $"Unable to load latest rule-analysis results: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingLatestRun = false;
+        }
+    }
+
+    private async Task StartRuleAnalysisAsync()
+    {
+        if (SelectedSolution is null)
+        {
+            return;
+        }
+
+        try
+        {
+            IsRunInProgress = true;
+            RunError = null;
+            LatestRun = await RuleAnalysisRunService.StartRunAsync(SelectedSolution.Id);
+        }
+        catch (Exception ex)
+        {
+            RunError = $"Unable to run rule analysis: {ex.Message}";
+        }
+        finally
+        {
+            IsRunInProgress = false;
+        }
     }
 
     private static string FormatStatus(RegisteredSolutionStatus status)
