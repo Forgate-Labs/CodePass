@@ -1,0 +1,127 @@
+@using System.Text.Json
+@using CodePass.Web.Services.Rules
+
+<div class="d-flex flex-column gap-2" data-testid="@ContainerTestId">
+    <label class="form-label fw-semibold mb-0" for="@FieldId">@Definition.Label</label>
+    <p class="form-text mt-0 mb-1">@Definition.Description</p>
+
+    @if (IsBooleanField)
+    {
+        <div class="form-check">
+            <input id="@FieldId"
+                   class="form-check-input"
+                   type="checkbox"
+                   checked="@BoolValue"
+                   @onchange="HandleBoolChangedAsync"
+                   data-testid="@CheckboxTestId" />
+            <label class="form-check-label" for="@FieldId">Enabled</label>
+        </div>
+    }
+    else if (IsListField)
+    {
+        <textarea id="@FieldId"
+                  class="form-control"
+                  rows="4"
+                  value="@ListValue"
+                  @onchange="HandleListChangedAsync"
+                  data-testid="@StringListTestId"></textarea>
+        <div class="form-text">Enter one value per line.</div>
+    }
+    else if (IsSelectField)
+    {
+        <select id="@FieldId"
+                class="form-select"
+                value="@StringValue"
+                @onchange="HandleStringChangedAsync"
+                data-testid="@SelectTestId">
+            @foreach (var option in Definition.AllowedValues!)
+            {
+                <option value="@option">@option</option>
+            }
+        </select>
+    }
+    else if (UseTextArea)
+    {
+        <textarea id="@FieldId"
+                  class="form-control"
+                  rows="3"
+                  value="@StringValue"
+                  @onchange="HandleStringChangedAsync"
+                  data-testid="@TextAreaTestId"></textarea>
+    }
+    else
+    {
+        <input id="@FieldId"
+               class="form-control"
+               value="@StringValue"
+               @onchange="HandleStringChangedAsync"
+               data-testid="@TextTestId" />
+    }
+</div>
+
+@code {
+    private string StringValue { get; set; } = string.Empty;
+    private bool BoolValue { get; set; }
+    private string ListValue { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public RuleCatalogFieldDefinition Definition { get; set; } = default!;
+
+    [Parameter]
+    public JsonElement? Value { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<JsonElement?> ValueChanged { get; set; }
+
+    private string FieldId => $"field-{Definition.Name}";
+    private string ContainerTestId => $"schema-field-{Definition.Name}";
+    private string CheckboxTestId => $"checkbox-field-{Definition.Name}";
+    private string StringListTestId => $"string-list-field-{Definition.Name}";
+    private string SelectTestId => $"select-field-{Definition.Name}";
+    private string TextAreaTestId => $"textarea-field-{Definition.Name}";
+    private string TextTestId => $"text-field-{Definition.Name}";
+    private bool IsBooleanField => Definition.JsonType == "boolean";
+    private bool IsListField => Definition.JsonType == "array";
+    private bool IsSelectField => Definition.JsonType == "string" && Definition.AllowedValues is { Count: > 0 };
+    private bool UseTextArea => Definition.JsonType == "string" && Definition.AllowedValues is null && Definition.Name.Contains("regex", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnParametersSet()
+    {
+        if (IsBooleanField)
+        {
+            BoolValue = Value is { ValueKind: JsonValueKind.True } || (Value is { ValueKind: JsonValueKind.False } ? Value.Value.GetBoolean() : false);
+            return;
+        }
+
+        if (IsListField)
+        {
+            ListValue = Value is { ValueKind: JsonValueKind.Array }
+                ? string.Join(Environment.NewLine, Value.Value.EnumerateArray().Select(item => item.GetString()).Where(item => !string.IsNullOrWhiteSpace(item)))
+                : string.Empty;
+            return;
+        }
+
+        StringValue = Value is { ValueKind: JsonValueKind.String } ? Value.Value.GetString() ?? string.Empty : string.Empty;
+    }
+
+    private Task HandleStringChangedAsync(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        StringValue = value;
+        return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(value));
+    }
+
+    private Task HandleBoolChangedAsync(ChangeEventArgs args)
+    {
+        BoolValue = args.Value is bool value && value;
+        return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(BoolValue));
+    }
+
+    private Task HandleListChangedAsync(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        ListValue = value;
+        var items = value.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(items));
+    }
+}

@@ -12,7 +12,7 @@
             <p class="text-body-secondary mb-0">Review the user-authored rules currently stored in CodePass. Supported rule kinds stay behind the authoring workflow and are never listed here as pseudo-rules.</p>
         </div>
 
-        <button class="btn btn-primary align-self-start" type="button" disabled data-testid="create-rule-button">
+        <button class="btn btn-primary align-self-start" type="button" @onclick="OpenCreateEditor" data-testid="create-rule-button">
             New authored rule
         </button>
     </div>
@@ -35,7 +35,8 @@
         <div class="card shadow-sm border-0" data-testid="rules-empty-state">
             <div class="card-body p-4 text-center">
                 <h2 class="h4 mb-2">No authored rules yet</h2>
-                <p class="text-body-secondary mb-3">CodePass v1 exposes only the rules you author. No shipped production rule packs are shown in this management view.</p>
+                <p class="text-body-secondary mb-3">Start a rule from scratch with the schema-driven editor. CodePass v1 exposes only the rules you author and never lists shipped production rule packs here.</p>
+                <button class="btn btn-outline-primary" type="button" @onclick="OpenCreateEditor">Create your first rule</button>
             </div>
         </div>
     }
@@ -45,16 +46,23 @@
             @foreach (var rule in Rules)
             {
                 <div class="col-12 col-xl-6" data-testid="rule-card-item">
-                    <RuleDefinitionCard Rule="rule" />
+                    <RuleDefinitionCard Rule="rule" OnEdit="OpenEditEditorAsync" />
                 </div>
             }
         </div>
     }
 </div>
 
+<RuleDefinitionEditor IsOpen="IsEditorOpen"
+                      Rule="SelectedRule"
+                      OnClose="CloseEditorAsync"
+                      OnSaved="HandleSavedAsync" />
+
 @code {
     private bool IsLoading { get; set; } = true;
+    private bool IsEditorOpen { get; set; }
     private string? LoadError { get; set; }
+    private AuthoredRuleDefinitionDto? SelectedRule { get; set; }
     private IReadOnlyList<AuthoredRuleDefinitionDto> Rules { get; set; } = Array.Empty<AuthoredRuleDefinitionDto>();
 
     protected override async Task OnInitializedAsync()
@@ -79,5 +87,32 @@
         {
             IsLoading = false;
         }
+    }
+
+    private void OpenCreateEditor()
+    {
+        SelectedRule = null;
+        IsEditorOpen = true;
+    }
+
+    private Task OpenEditEditorAsync(AuthoredRuleDefinitionDto rule)
+    {
+        SelectedRule = rule;
+        IsEditorOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseEditorAsync()
+    {
+        SelectedRule = null;
+        IsEditorOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleSavedAsync()
+    {
+        SelectedRule = null;
+        IsEditorOpen = false;
+        await LoadRulesAsync();
     }
 }

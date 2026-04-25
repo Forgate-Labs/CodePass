@@ -1,0 +1,404 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@using CodePass.Web.Data.Entities
+@using CodePass.Web.Services.Rules
+@implements IDisposable
+@inject IRuleCatalogService RuleCatalogService
+@inject IRuleDefinitionService RuleDefinitionService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content shadow">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title h4 mb-1">@(IsEditMode ? "Edit authored rule" : "Create authored rule")</h2>
+                        <p class="text-body-secondary mb-0">Build a user-authored rule with stable metadata and a schema-driven rule-kind form. Catalog metadata only drives the editor.</p>
+                    </div>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
+                </div>
+
+                <EditForm EditContext="EditContext" OnValidSubmit="HandleValidSubmitAsync">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body d-flex flex-column gap-4">
+                        @if (!string.IsNullOrWhiteSpace(LoadError))
+                        {
+                            <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-load-error">@LoadError</div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(SubmissionError))
+                        {
+                            <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-submission-error">@SubmissionError</div>
+                        }
+
+                        <section class="d-flex flex-column gap-3">
+                            <div>
+                                <h3 class="h5 mb-1">Rule metadata</h3>
+                                <p class="text-body-secondary mb-0">These values become the stable authored DSL metadata stored by CodePass.</p>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="rule-code">Rule code</label>
+                                    <InputText id="rule-code" class="form-control" @bind-Value="Model.Code" data-testid="rule-code-input" />
+                                    <ValidationMessage For="() => Model.Code" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="rule-title">Title</label>
+                                    <InputText id="rule-title" class="form-control" @bind-Value="Model.Title" data-testid="rule-title-input" />
+                                    <ValidationMessage For="() => Model.Title" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="rule-description">Description</label>
+                                    <InputTextArea id="rule-description" class="form-control" rows="3" @bind-Value="Model.Description" data-testid="rule-description-input" />
+                                    <ValidationMessage For="() => Model.Description" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="rule-severity">Severity</label>
+                                    <InputSelect id="rule-severity" class="form-select" @bind-Value="Model.Severity" data-testid="rule-severity-input">
+                                        @foreach (var severity in Enum.GetValues<RuleSeverity>())
+                                        {
+                                            <option value="@severity">@severity</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="rule-kind">Rule kind</label>
+                                    <InputSelect id="rule-kind" class="form-select" @bind-Value="Model.RuleKind" @bind-Value:after="HandleRuleKindChangedAsync" data-testid="rule-kind-select">
+                                        <option value="">Select a rule kind</option>
+                                        @foreach (var ruleKind in RuleKinds)
+                                        {
+                                            <option value="@ruleKind.Kind">@ruleKind.Title (@ruleKind.Kind)</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="() => Model.RuleKind" />
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox id="rule-enabled" class="form-check-input" @bind-Value="Model.IsEnabled" data-testid="rule-enabled-input" />
+                                        <label class="form-check-label" for="rule-enabled">Enabled</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        @if (SelectedRuleKind is not null)
+                        {
+                            <section class="d-flex flex-column gap-3" data-testid="dynamic-schema-section">
+                                <div>
+                                    <h3 class="h5 mb-1">Schema-driven fields</h3>
+                                    <p class="text-body-secondary mb-0">Fill the generated scope and parameter fields for <strong>@SelectedRuleKind.Title</strong>. Defaults come from the supported rule kind metadata.</p>
+                                </div>
+
+                                <div class="row g-4">
+                                    <div class="col-12 col-lg-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <h4 class="h6 mb-3">Scope</h4>
+                                            <div class="d-flex flex-column gap-3">
+                                                @foreach (var field in SelectedRuleKind.ScopeFields)
+                                                {
+                                                    <SchemaFieldEditor Definition="field"
+                                                                       Value="GetScopeValue(field.Name)"
+                                                                       ValueChanged="value => HandleScopeValueChanged(field.Name, value)" />
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-lg-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <h4 class="h6 mb-3">Parameters</h4>
+                                            <div class="d-flex flex-column gap-3">
+                                                @foreach (var field in SelectedRuleKind.ParameterFields)
+                                                {
+                                                    <SchemaFieldEditor Definition="field"
+                                                                       Value="GetParameterValue(field.Name)"
+                                                                       ValueChanged="value => HandleParameterValueChanged(field.Name, value)" />
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        }
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="CloseAsync" disabled="@IsSubmitting">Cancel</button>
+                        <button class="btn btn-primary" type="submit" data-testid="save-rule-button" disabled="@IsSubmitting || IsCatalogLoading">@(IsSubmitting ? "Saving..." : (IsEditMode ? "Save changes" : "Save authored rule"))</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private readonly RuleDefinitionFormModel Model = new();
+    private readonly Dictionary<string, JsonElement> ScopeValues = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, JsonElement> ParameterValues = new(StringComparer.Ordinal);
+    private ValidationMessageStore? ValidationMessageStore { get; set; }
+    private EditContext EditContext { get; set; } = default!;
+    private IReadOnlyList<RuleKindCatalogEntry> RuleKinds { get; set; } = Array.Empty<RuleKindCatalogEntry>();
+    private RuleKindCatalogEntry? SelectedRuleKind { get; set; }
+    private string? LoadError { get; set; }
+    private string? SubmissionError { get; set; }
+    private bool IsCatalogLoading { get; set; }
+    private bool IsSubmitting { get; set; }
+    private bool IsEditMode => Rule is not null;
+
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public AuthoredRuleDefinitionDto? Rule { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    protected override void OnInitialized()
+    {
+        EditContext = new EditContext(Model);
+        ValidationMessageStore = new ValidationMessageStore(EditContext);
+        EditContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!IsOpen)
+        {
+            return;
+        }
+
+        await LoadCatalogAsync();
+        LoadModelFromRule();
+    }
+
+    private async Task LoadCatalogAsync()
+    {
+        try
+        {
+            IsCatalogLoading = true;
+            LoadError = null;
+            RuleKinds = await RuleCatalogService.GetRuleKindsAsync();
+        }
+        catch (Exception ex)
+        {
+            RuleKinds = Array.Empty<RuleKindCatalogEntry>();
+            LoadError = $"Unable to load supported rule kinds: {ex.Message}";
+        }
+        finally
+        {
+            IsCatalogLoading = false;
+        }
+    }
+
+    private void LoadModelFromRule()
+    {
+        ValidationMessageStore?.Clear();
+        SubmissionError = null;
+        ScopeValues.Clear();
+        ParameterValues.Clear();
+
+        if (Rule is null)
+        {
+            Model.Code = string.Empty;
+            Model.Title = string.Empty;
+            Model.Description = string.Empty;
+            Model.RuleKind = string.Empty;
+            Model.Severity = RuleSeverity.Warning;
+            Model.IsEnabled = true;
+            SelectedRuleKind = null;
+            EditContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        Model.Code = Rule.Code;
+        Model.Title = Rule.Title;
+        Model.Description = Rule.Description ?? string.Empty;
+        Model.RuleKind = Rule.RuleKind;
+        Model.Severity = Rule.Severity;
+        Model.IsEnabled = Rule.IsEnabled;
+        SelectedRuleKind = RuleKinds.FirstOrDefault(entry => string.Equals(entry.Kind, Rule.RuleKind, StringComparison.Ordinal));
+        HydrateValues(Rule.ScopeJson, ScopeValues);
+        HydrateValues(Rule.ParametersJson, ParameterValues);
+        ApplyDefaultsForMissingValues();
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private Task HandleRuleKindChangedAsync()
+    {
+        SubmissionError = null;
+        ValidationMessageStore?.Clear(FieldIdentifier.Create(() => Model.RuleKind));
+        SelectedRuleKind = RuleKinds.FirstOrDefault(entry => string.Equals(entry.Kind, Model.RuleKind, StringComparison.Ordinal));
+        ScopeValues.Clear();
+        ParameterValues.Clear();
+        ApplyDefaultsForMissingValues();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        SubmissionError = null;
+        ValidationMessageStore?.Clear();
+
+        if (SelectedRuleKind is null)
+        {
+            ValidationMessageStore?.Add(() => Model.RuleKind, "Rule kind is required.");
+            EditContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        try
+        {
+            IsSubmitting = true;
+
+            var request = new SaveAuthoredRuleDefinitionRequest(
+                Model.Code,
+                Model.Title,
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                SelectedRuleKind.Kind,
+                SelectedRuleKind.SchemaVersion,
+                Model.Severity,
+                SerializeDictionary(ScopeValues),
+                SerializeDictionary(ParameterValues),
+                Model.IsEnabled);
+
+            if (Rule is null)
+            {
+                await RuleDefinitionService.CreateAsync(request);
+            }
+            else
+            {
+                await RuleDefinitionService.UpdateAsync(Rule.Id, request);
+            }
+
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException)
+        {
+            SubmissionError = ex.Message;
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    private JsonElement? GetScopeValue(string fieldName)
+        => ScopeValues.TryGetValue(fieldName, out var value) ? value : null;
+
+    private JsonElement? GetParameterValue(string fieldName)
+        => ParameterValues.TryGetValue(fieldName, out var value) ? value : null;
+
+    private Task HandleScopeValueChanged(string fieldName, JsonElement? value)
+    {
+        UpdateValue(ScopeValues, fieldName, value);
+        return Task.CompletedTask;
+    }
+
+    private Task HandleParameterValueChanged(string fieldName, JsonElement? value)
+    {
+        UpdateValue(ParameterValues, fieldName, value);
+        return Task.CompletedTask;
+    }
+
+    private static void UpdateValue(IDictionary<string, JsonElement> values, string fieldName, JsonElement? value)
+    {
+        if (value is null)
+        {
+            values.Remove(fieldName);
+            return;
+        }
+
+        values[fieldName] = value.Value;
+    }
+
+    private void ApplyDefaultsForMissingValues()
+    {
+        if (SelectedRuleKind is null)
+        {
+            return;
+        }
+
+        ApplyDefaults(SelectedRuleKind.ScopeFields, ScopeValues);
+        ApplyDefaults(SelectedRuleKind.ParameterFields, ParameterValues);
+    }
+
+    private static void ApplyDefaults(IEnumerable<RuleCatalogFieldDefinition> definitions, IDictionary<string, JsonElement> target)
+    {
+        foreach (var definition in definitions)
+        {
+            if (target.ContainsKey(definition.Name) || definition.DefaultValue is null)
+            {
+                continue;
+            }
+
+            target[definition.Name] = definition.DefaultValue.Value.Clone();
+        }
+    }
+
+    private static void HydrateValues(string json, IDictionary<string, JsonElement> target)
+    {
+        var element = JsonSerializer.Deserialize<JsonElement>(json);
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            target[property.Name] = property.Value.Clone();
+        }
+    }
+
+    private static string SerializeDictionary(IEnumerable<KeyValuePair<string, JsonElement>> values)
+    {
+        var dictionary = values.ToDictionary(item => item.Key, item => item.Value);
+        return JsonSerializer.Serialize(dictionary);
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        SubmissionError = null;
+
+        if (e.FieldIdentifier.FieldName == nameof(RuleDefinitionFormModel.RuleKind))
+        {
+            ValidationMessageStore?.Clear(e.FieldIdentifier);
+            EditContext.NotifyValidationStateChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        EditContext.OnFieldChanged -= HandleFieldChanged;
+    }
+
+    private sealed class RuleDefinitionFormModel
+    {
+        [Required(ErrorMessage = "Rule code is required.")]
+        [StringLength(64, ErrorMessage = "Rule code must be 64 characters or fewer.")]
+        public string Code { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Title is required.")]
+        [StringLength(200, ErrorMessage = "Title must be 200 characters or fewer.")]
+        public string Title { get; set; } = string.Empty;
+
+        [StringLength(2000, ErrorMessage = "Description must be 2000 characters or fewer.")]
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Rule kind is required.")]
+        public string RuleKind { get; set; } = string.Empty;
+
+        public RuleSeverity Severity { get; set; } = RuleSeverity.Warning;
+
+        public bool IsEnabled { get; set; } = true;
+    }
+}
