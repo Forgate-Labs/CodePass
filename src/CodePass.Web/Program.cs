@@ -1,5 +1,6 @@
 using CodePass.Web.Components;
 using CodePass.Web.Data;
+using CodePass.Web.Services.RuleAnalysis;
 using CodePass.Web.Services.Rules;
 using CodePass.Web.Services.Solutions;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ builder.Services.AddScoped<ISolutionPathValidator, SolutionPathValidator>();
 builder.Services.AddScoped<IRegisteredSolutionService, RegisteredSolutionService>();
 builder.Services.AddScoped<IRuleCatalogService, RuleCatalogService>();
 builder.Services.AddScoped<IRuleDefinitionService, RuleDefinitionService>();
+builder.Services.AddScoped<ISolutionRuleSelectionService, SolutionRuleSelectionService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
