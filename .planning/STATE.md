@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-04-19T23:36:30Z"
-last_activity: 2026-04-19 — Completed plan 01-03 with the registered-solutions edit/remove flow, regression coverage, and approved end-to-end verification.
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-04-25T01:33:29Z"
+last_activity: 2026-04-25 — Completed plan 02-01 with authored rule persistence, the closed catalog, and authored-only service coverage.
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_plans: 6
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State
@@ -26,31 +26,33 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 2 of 5 (User-Authored Rule Definitions)
-Plan: 0 of TBD in current phase
-Status: Ready for next phase planning
-Last activity: 2026-04-19 — Completed plan 01-03 with the registered-solutions edit/remove flow, regression coverage, and approved end-to-end verification.
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-04-25 — Completed plan 02-01 with authored rule persistence, the closed catalog, and authored-only service coverage.
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 20.3 min
-- Total execution time: 1.0 hours
+- Total plans completed: 4
+- Average duration: 17.2 min
+- Total execution time: 1.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
+| 02-user-authored-rule-definitions | 1 | 8 min | 8.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-registered-solutions-01 (31 min), 01-registered-solutions-02 (10 min), 01-registered-solutions-03 (20 min)
+- Last 5 plans: 01-registered-solutions-01 (31 min), 01-registered-solutions-02 (10 min), 01-registered-solutions-03 (20 min), 02-user-authored-rule-definitions-01 (8 min)
 - Trend: Stable
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
+| Phase 02 P01 | 8 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -71,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 01-registered-solutions]: Registered solution maintenance stays in a dedicated modal so cards remain non-destructive surfaces. — Keeps the registered-solutions cards focused on status visibility while the modal owns edit and delete affordances.
 - [Phase 01-registered-solutions]: Solution path edits revalidate only when the path value changes, preserving saved metadata updates without unnecessary filesystem checks. — Display-name-only edits should not force redundant validation, but changed paths must still be rechecked before persistence.
 - [Phase 01-registered-solutions]: The full /solutions flow was accepted through a human verification checkpoint after a follow-up bug-fix clarified the picker-assisted add experience. — This records the approved checkpoint outcome and the small UX fix needed to satisfy live verification.
+- [Phase 02]: Keep rule-kind metadata in a closed in-code catalog so the UI can render supported schemas without turning catalog entries into active rules. — Separates engine-supported authoring metadata from persisted authored rules and preserves the authored-only v1 constraint.
+- [Phase 02]: Persist scope, parameters, and raw DSL documents as normalized JSON strings to stay SQLite-friendly and deterministic in tests. — String-backed JSON keeps storage provider-agnostic for SQLite while giving the UI and later execution phases stable serialized payloads.
 
 ### Pending Todos
 
@@ -82,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-19T23:35:55.933Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-04-25T01:32:31.341Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

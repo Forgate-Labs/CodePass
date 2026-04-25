@@ -17,7 +17,7 @@
 - [ ] **RULE-04**: User can enable or disable a custom rule per registered solution.
 - [ ] **RULE-05**: User can review rule-analysis results grouped by rule.
 - [ ] **RULE-06**: User can inspect each rule violation with its severity, file path, and code location.
-- [ ] **RULE-07**: User can work only with user-authored rules in the product, without depending on built-in production rule packs.
+- [x] **RULE-07**: User can work only with user-authored rules in the product, without depending on built-in production rule packs.
 
 ### Coverage
 
@@ -58,7 +58,7 @@
 | PROJ-04 | Phase 1 - Registered Solutions | Complete |
 | RULE-02 | Phase 2 - User-Authored Rule Definitions | Pending |
 | RULE-03 | Phase 2 - User-Authored Rule Definitions | Pending |
-| RULE-07 | Phase 2 - User-Authored Rule Definitions | Pending |
+| RULE-07 | Phase 2 - User-Authored Rule Definitions | Complete |
 | RULE-01 | Phase 3 - Rule Analysis Review | Pending |
 | RULE-04 | Phase 3 - Rule Analysis Review | Pending |
 | RULE-05 | Phase 3 - Rule Analysis Review | Pending |

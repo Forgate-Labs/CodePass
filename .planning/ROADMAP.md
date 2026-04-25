@@ -40,7 +40,11 @@ Plans:
   1. Admin user can create a new custom rule from scratch through a schema-driven editor backed by the rule DSL.
   2. Admin user can switch to raw JSON editing when direct control over the DSL is needed.
   3. The product exposes only user-authored rules as active rules inside CodePass, with no built-in production rule pack required or enabled.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [x] 02-01-PLAN.md — Add authored-rule persistence, the closed rule-kind catalog, and authored-only active-rule services.
+- [ ] 02-02-PLAN.md — Build the `/rules` page, authored-rule listing UI, and schema-driven editor flow.
+- [ ] 02-03-PLAN.md — Add raw JSON editing, JSON validation, and final `/rules` workflow verification.
 
 ### Phase 3: Rule Analysis Review
 **Goal**: Users can decide which authored rules apply to each solution, run rule analysis on demand, and inspect violations clearly.
@@ -105,7 +109,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
-| 2. User-Authored Rule Definitions | 0/TBD | Not started | - |
+| 2. User-Authored Rule Definitions | 1/3 | In Progress | - |
 | 3. Rule Analysis Review | 0/TBD | Not started | - |
 | 4. Coverage Analysis Review | 0/TBD | Not started | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |
