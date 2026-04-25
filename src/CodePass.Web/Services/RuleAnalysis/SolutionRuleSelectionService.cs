@@ -84,22 +84,23 @@ public sealed class SolutionRuleSelectionService(CodePassDbContext dbContext) : 
                 dbContext.AuthoredRuleDefinitions.AsNoTracking().Where(rule => rule.IsEnabled),
                 assignment => assignment.AuthoredRuleDefinitionId,
                 rule => rule.Id,
-                (assignment, rule) => new AuthoredRuleDefinitionDto(
-                    rule.Id,
-                    rule.Code,
-                    rule.Title,
-                    rule.Description,
-                    rule.RuleKind,
-                    rule.SchemaVersion,
-                    rule.Severity,
-                    rule.ScopeJson,
-                    rule.ParametersJson,
-                    rule.RawDefinitionJson,
-                    rule.IsEnabled,
-                    rule.CreatedAtUtc,
-                    rule.UpdatedAtUtc))
+                (assignment, rule) => rule)
             .OrderBy(rule => rule.Title)
             .ThenBy(rule => rule.Code)
+            .Select(rule => new AuthoredRuleDefinitionDto(
+                rule.Id,
+                rule.Code,
+                rule.Title,
+                rule.Description,
+                rule.RuleKind,
+                rule.SchemaVersion,
+                rule.Severity,
+                rule.ScopeJson,
+                rule.ParametersJson,
+                rule.RawDefinitionJson,
+                rule.IsEnabled,
+                rule.CreatedAtUtc,
+                rule.UpdatedAtUtc))
             .ToListAsync(cancellationToken);
     }
 

@@ -2,6 +2,7 @@ using CodePass.Web.Data;
 using CodePass.Web.Data.Entities;
 using CodePass.Web.Services.RuleAnalysis;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace CodePass.Web.Tests.Services;
@@ -85,6 +86,34 @@ public sealed class SolutionRuleSelectionServiceTests
     }
 
     [Fact]
+    public async Task GetEnabledRuleDefinitionsForSolutionAsync_ShouldOrderEnabledRulesWithSqliteProvider()
+    {
+        await using var fixture = await SolutionRuleSelectionServiceFixture.CreateSqliteAsync();
+        var now = DateTimeOffset.UtcNow;
+        var alphaEnabledRule = SolutionRuleSelectionServiceFixture.CreateRule("CP0999", "Alpha enabled rule", isEnabled: true, now);
+        fixture.DbContext.AuthoredRuleDefinitions.Add(alphaEnabledRule);
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.Service.SetRuleEnabledAsync(new SetSolutionRuleSelectionRequest(
+            fixture.SolutionA.Id,
+            fixture.GloballyEnabledRule.Id,
+            IsEnabled: true));
+        await fixture.Service.SetRuleEnabledAsync(new SetSolutionRuleSelectionRequest(
+            fixture.SolutionA.Id,
+            alphaEnabledRule.Id,
+            IsEnabled: true));
+        await fixture.Service.SetRuleEnabledAsync(new SetSolutionRuleSelectionRequest(
+            fixture.SolutionA.Id,
+            fixture.GloballyDisabledRule.Id,
+            IsEnabled: true));
+
+        var enabledRules = await fixture.Service.GetEnabledRuleDefinitionsForSolutionAsync(fixture.SolutionA.Id);
+
+        enabledRules.Select(rule => rule.Code).Should().Equal("CP0999", "CP1000");
+        enabledRules.Should().OnlyContain(rule => rule.IsEnabled);
+    }
+
+    [Fact]
     public async Task SetRuleEnabledAsync_ShouldThrowClearExceptionForUnknownSolutionOrRule()
     {
         await using var fixture = await SolutionRuleSelectionServiceFixture.CreateAsync();
@@ -112,7 +141,8 @@ internal sealed class SolutionRuleSelectionServiceFixture : IAsyncDisposable
         RegisteredSolution solutionA,
         RegisteredSolution solutionB,
         AuthoredRuleDefinition globallyEnabledRule,
-        AuthoredRuleDefinition globallyDisabledRule)
+        AuthoredRuleDefinition globallyDisabledRule,
+        SqliteConnection? sqliteConnection = null)
     {
         DbContext = dbContext;
         Service = service;
@@ -120,6 +150,7 @@ internal sealed class SolutionRuleSelectionServiceFixture : IAsyncDisposable
         SolutionB = solutionB;
         GloballyEnabledRule = globallyEnabledRule;
         GloballyDisabledRule = globallyDisabledRule;
+        SqliteConnection = sqliteConnection;
     }
 
     public CodePassDbContext DbContext { get; }
@@ -133,6 +164,8 @@ internal sealed class SolutionRuleSelectionServiceFixture : IAsyncDisposable
     public AuthoredRuleDefinition GloballyEnabledRule { get; }
 
     public AuthoredRuleDefinition GloballyDisabledRule { get; }
+
+    private SqliteConnection? SqliteConnection { get; }
 
     public static async Task<SolutionRuleSelectionServiceFixture> CreateAsync()
     {
@@ -162,9 +195,46 @@ internal sealed class SolutionRuleSelectionServiceFixture : IAsyncDisposable
             globallyDisabledRule);
     }
 
+    public static async Task<SolutionRuleSelectionServiceFixture> CreateSqliteAsync()
+    {
+        var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<CodePassDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        var dbContext = new CodePassDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        var solutionA = CreateSolution("Solution A", "/tmp/solution-a.sln", now);
+        var solutionB = CreateSolution("Solution B", "/tmp/solution-b.sln", now);
+        var globallyEnabledRule = CreateRule("CP1000", "Zeta enabled rule", isEnabled: true, now);
+        var globallyDisabledRule = CreateRule("CP1001", "Alpha globally disabled rule", isEnabled: false, now);
+
+        dbContext.RegisteredSolutions.AddRange(solutionA, solutionB);
+        dbContext.AuthoredRuleDefinitions.AddRange(globallyEnabledRule, globallyDisabledRule);
+        await dbContext.SaveChangesAsync();
+
+        return new SolutionRuleSelectionServiceFixture(
+            dbContext,
+            new SolutionRuleSelectionService(dbContext),
+            solutionA,
+            solutionB,
+            globallyEnabledRule,
+            globallyDisabledRule,
+            connection);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await DbContext.DisposeAsync();
+
+        if (SqliteConnection is not null)
+        {
+            await SqliteConnection.DisposeAsync();
+        }
     }
 
     private static RegisteredSolution CreateSolution(string displayName, string solutionPath, DateTimeOffset now) => new()
@@ -178,7 +248,7 @@ internal sealed class SolutionRuleSelectionServiceFixture : IAsyncDisposable
         UpdatedAtUtc = now
     };
 
-    private static AuthoredRuleDefinition CreateRule(string code, string title, bool isEnabled, DateTimeOffset now) => new()
+    public static AuthoredRuleDefinition CreateRule(string code, string title, bool isEnabled, DateTimeOffset now) => new()
     {
         Id = Guid.NewGuid(),
         Code = code,
