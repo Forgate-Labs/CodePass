@@ -52,12 +52,70 @@ public sealed class RuleDefinitionJsonModeTests : TestContext
         await cut.Find("[data-testid='rule-kind-select']").ChangeAsync(new ChangeEventArgs { Value = "syntax_presence" });
         await cut.Find("[data-testid='json-mode-button']").ClickAsync(new MouseEventArgs());
         await cut.Find("[data-testid='rule-raw-json-input']").ChangeAsync(new ChangeEventArgs { Value = "{ invalid json" });
+
+        cut.Find("[data-testid='save-rule-button']").HasAttribute("disabled").Should().BeFalse();
+
         await cut.Find("form").SubmitAsync();
 
         cut.WaitForAssertion(() =>
         {
             ruleService.CreateCalls.Should().Be(0);
             cut.Find("[data-testid='rule-editor-json-error']").TextContent.Should().Contain("valid JSON");
+            cut.Find("[data-testid='save-rule-button']").HasAttribute("disabled").Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task RawJsonMode_ShouldEnableSaveAndSubmitValidJsonWithoutPrefilledMetadata()
+    {
+        var ruleService = new FakeRuleDefinitionService();
+        Services.AddSingleton<IRuleDefinitionService>(ruleService);
+        Services.AddSingleton<IRuleCatalogService>(new FakeRuleCatalogService());
+
+        var cut = RenderComponent<RuleDefinitionEditor>(parameters => parameters
+            .Add(parameter => parameter.IsOpen, true));
+
+        await cut.Find("[data-testid='rule-kind-select']").ChangeAsync(new ChangeEventArgs { Value = "syntax_presence" });
+        await cut.Find("[data-testid='json-mode-button']").ClickAsync(new MouseEventArgs());
+
+        cut.Find("[data-testid='save-rule-button']").HasAttribute("disabled").Should().BeFalse();
+
+        var editedJson = JsonSerializer.Serialize(new
+        {
+            id = "CP3003",
+            title = "Avoid goto from raw json",
+            description = "Created through raw json without prefilled metadata",
+            kind = "syntax_presence",
+            schemaVersion = "1.0",
+            severity = "warning",
+            enabled = true,
+            language = "csharp",
+            scope = new
+            {
+                projects = new[] { "*" },
+                files = new[] { "**/*.cs" },
+                excludeFiles = Array.Empty<string>()
+            },
+            parameters = new
+            {
+                mode = "forbid",
+                targets = new[] { "member_access" },
+                syntaxKinds = new[] { "goto" },
+                allowInTests = false
+            }
+        }, new JsonSerializerOptions { WriteIndented = true });
+
+        await cut.Find("[data-testid='rule-raw-json-input']").ChangeAsync(new ChangeEventArgs { Value = editedJson });
+        await cut.Find("form").SubmitAsync();
+
+        cut.WaitForAssertion(() =>
+        {
+            ruleService.CreateCalls.Should().Be(1);
+            ruleService.CreatedRequests.Should().ContainSingle();
+            ruleService.CreatedRequests[0].Code.Should().Be("CP3003");
+            ruleService.CreatedRequests[0].Title.Should().Be("Avoid goto from raw json");
+            ruleService.CreatedRequests[0].RawDefinitionJson.Should().NotBeNull();
+            ruleService.CreatedRequests[0].RawDefinitionJson.Should().Contain("\"syntaxKinds\"");
         });
     }
 

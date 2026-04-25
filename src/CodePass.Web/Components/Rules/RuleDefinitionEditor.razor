@@ -10,7 +10,7 @@
 {
     <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-            <EditForm EditContext="EditContext" OnValidSubmit="HandleValidSubmitAsync" class="modal-content shadow rule-definition-editor-form">
+            <EditForm EditContext="EditContext" OnSubmit="HandleSubmitAsync" class="modal-content shadow rule-definition-editor-form">
                 <DataAnnotationsValidator />
                 <div class="modal-header">
                     <div>
@@ -168,7 +168,7 @@
 
                 <div class="modal-footer">
                     <button class="btn btn-outline-secondary" type="button" @onclick="CloseAsync" disabled="@IsSubmitting">Cancel</button>
-                    <button class="btn btn-primary" type="submit" data-testid="save-rule-button" disabled="@IsSubmitting || IsCatalogLoading">@(IsSubmitting ? "Saving..." : (IsEditMode ? "Save changes" : "Save authored rule"))</button>
+                    <button class="btn btn-primary" type="submit" data-testid="save-rule-button" disabled="@IsSaveDisabled">@(IsSubmitting ? "Saving..." : (IsEditMode ? "Save changes" : "Save authored rule"))</button>
                 </div>
             </EditForm>
         </div>
@@ -193,6 +193,7 @@
     private bool IsSubmitting { get; set; }
     private bool IsJsonMode { get; set; }
     private bool IsEditMode => Rule is not null;
+    private bool IsSaveDisabled => IsSubmitting || (IsCatalogLoading && SelectedRuleKind is null);
 
     [Parameter]
     public bool IsOpen { get; set; }
@@ -332,22 +333,27 @@
         RawDefinitionJson = args.Value?.ToString() ?? string.Empty;
     }
 
-    private async Task HandleValidSubmitAsync()
+    private async Task HandleSubmitAsync(EditContext editContext)
     {
         SubmissionError = null;
         JsonModeError = null;
         ValidationMessageStore?.Clear();
 
+        if (IsJsonMode && !TryApplyRawJsonToForm(RawDefinitionJson, out var jsonError))
+        {
+            JsonModeError = jsonError;
+            return;
+        }
+
+        if (!editContext.Validate())
+        {
+            return;
+        }
+
         if (SelectedRuleKind is null)
         {
             ValidationMessageStore?.Add(() => Model.RuleKind, "Rule kind is required.");
             EditContext.NotifyValidationStateChanged();
-            return;
-        }
-
-        if (IsJsonMode && !TryApplyRawJsonToForm(RawDefinitionJson, out var jsonError))
-        {
-            JsonModeError = jsonError;
             return;
         }
 
@@ -487,7 +493,7 @@
         return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true });
     }
 
-    private bool TryApplyRawJsonToForm(string json, out string errorMessage)
+    private bool TryApplyRawJsonToForm(string json, out string? errorMessage)
     {
         try
         {
@@ -595,7 +601,7 @@
 
             ApplyDefaultsForMissingValues();
             RawDefinitionJson = FormatJson(json);
-            errorMessage = string.Empty;
+            errorMessage = null;
             return true;
         }
         catch (JsonException)
