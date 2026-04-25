@@ -107,6 +107,102 @@ public sealed class RoslynRuleAnalyzerTests
         AssertHasLocation(findings[0]);
     }
 
+    [Fact]
+    public async Task AnalyzeAsync_ShouldReturnNoFindingsForEmptyRuleList()
+    {
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync("/tmp/missing-solution.sln", []);
+
+        findings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldHonorExcludedFileScopes()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public void Run()
+                {
+                    var value = 42;
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1004",
+            title: "Avoid var outside excluded files",
+            kind: "syntax_presence",
+            severity: RuleSeverity.Warning,
+            parametersJson: "{\"mode\":\"forbid\",\"targets\":[\"local_declaration\"],\"syntaxKinds\":[\"var\"]}",
+            scopeJson: "{\"files\":[\"**/*.cs\"],\"excludeFiles\":[\"SampleProject/PolicyTarget.cs\"]}");
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        findings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldThrowClearExceptionForInvalidRuleParameterJson()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public void Run()
+                {
+                    var value = 42;
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1005",
+            title: "Invalid JSON rule",
+            kind: "syntax_presence",
+            severity: RuleSeverity.Warning,
+            parametersJson: "{\"mode\":\"forbid\",\"syntaxKinds\":[\"var\"]");
+
+        var act = async () => await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*CP1005*parameters JSON*invalid*");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldFlowCancellationThroughWorkspaceOperations()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public void Run()
+                {
+                    var value = 42;
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1006",
+            title: "Avoid var with cancellation",
+            kind: "syntax_presence",
+            severity: RuleSeverity.Warning,
+            parametersJson: "{\"mode\":\"forbid\",\"targets\":[\"local_declaration\"],\"syntaxKinds\":[\"var\"]}");
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        var act = async () => await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule], cancellationTokenSource.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     private static AuthoredRuleDefinitionDto CreateRule(
         string code,
         string title,

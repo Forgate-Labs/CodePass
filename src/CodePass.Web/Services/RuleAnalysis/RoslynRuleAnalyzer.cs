@@ -114,7 +114,8 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         SyntaxNode root,
         string relativePath)
     {
-        var parameters = JsonDocument.Parse(rule.ParametersJson).RootElement;
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
         var mode = GetString(parameters, "mode") ?? "forbid";
         var syntaxKinds = GetStringArray(parameters, "syntaxKinds").Select(value => value.Trim().ToLowerInvariant()).ToArray();
         if (syntaxKinds.Length == 0)
@@ -213,7 +214,8 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         string relativePath,
         CancellationToken cancellationToken)
     {
-        var parameters = JsonDocument.Parse(rule.ParametersJson).RootElement;
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
         var forbiddenSymbols = GetStringArray(parameters, "forbiddenSymbols").ToArray();
         if (forbiddenSymbols.Length == 0)
         {
@@ -274,7 +276,8 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         string relativePath,
         CancellationToken cancellationToken)
     {
-        var parameters = JsonDocument.Parse(rule.ParametersJson).RootElement;
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
         var symbolKinds = GetStringArray(parameters, "symbolKinds").Select(value => value.Trim().ToLowerInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (symbolKinds.Count == 0)
         {
@@ -455,7 +458,8 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
 
     private static bool IsRuleInScope(AuthoredRuleDefinitionDto rule, string relativePath)
     {
-        var scope = JsonDocument.Parse(rule.ScopeJson).RootElement;
+        using var scopeDocument = ParseRuleJsonDocument(rule, rule.ScopeJson, "scope JSON");
+        var scope = scopeDocument.RootElement;
         var files = GetStringArray(scope, "files").DefaultIfEmpty("**/*.cs").ToArray();
         var excludeFiles = GetStringArray(scope, "excludeFiles").ToArray();
 
@@ -508,6 +512,18 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
     private static string NormalizePath(string path)
     {
         return path.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+    }
+
+    private static JsonDocument ParseRuleJsonDocument(AuthoredRuleDefinitionDto rule, string json, string payloadName)
+    {
+        try
+        {
+            return JsonDocument.Parse(json);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException($"Rule '{rule.Code}' {payloadName} is invalid.", exception);
+        }
     }
 
     private static string? GetString(JsonElement element, string propertyName)
