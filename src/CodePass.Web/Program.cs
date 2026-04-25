@@ -18,6 +18,7 @@ builder.Services.AddScoped<IRegisteredSolutionService, RegisteredSolutionService
 builder.Services.AddScoped<IRuleCatalogService, RuleCatalogService>();
 builder.Services.AddScoped<IRuleDefinitionService, RuleDefinitionService>();
 builder.Services.AddScoped<ISolutionRuleSelectionService, SolutionRuleSelectionService>();
+builder.Services.AddScoped<IRuleAnalysisResultService, RuleAnalysisResultService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
