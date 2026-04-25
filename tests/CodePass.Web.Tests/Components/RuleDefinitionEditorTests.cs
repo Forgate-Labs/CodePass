@@ -33,6 +33,32 @@ public sealed class RuleDefinitionEditorTests : TestContext
     }
 
     [Fact]
+    public async Task SelectingRuleKind_ShouldUseScrollableBootstrapModalStructureWithReachableFooter()
+    {
+        Services.AddSingleton<IRuleDefinitionService>(new FakeRuleDefinitionService());
+        Services.AddSingleton<IRuleCatalogService>(new FakeRuleCatalogService());
+
+        var cut = RenderComponent<RuleDefinitionEditor>(parameters => parameters
+            .Add(parameter => parameter.IsOpen, true));
+
+        await cut.Find("[data-testid='rule-kind-select']").ChangeAsync(new ChangeEventArgs { Value = "syntax_presence" });
+        await cut.Find("[data-testid='json-mode-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            var dialog = cut.Find(".modal-dialog");
+            dialog.ClassList.Should().Contain("modal-dialog-scrollable");
+
+            var form = cut.Find("form.rule-definition-editor-form.modal-content");
+            form.ParentElement?.ClassList.Contains("modal-dialog").Should().BeTrue();
+            form.Children.Any(child => child.ClassList.Contains("modal-body")).Should().BeTrue();
+            form.Children.Any(child => child.ClassList.Contains("modal-footer")).Should().BeTrue();
+            form.QuerySelector(".modal-body .modal-footer").Should().BeNull();
+            cut.Find("[data-testid='save-rule-button']").TextContent.Should().Contain("Save authored rule");
+        });
+    }
+
+    [Fact]
     public async Task MissingRequiredMetadata_ShouldBlockSaveBeforeServiceCall()
     {
         var ruleService = new FakeRuleDefinitionService();

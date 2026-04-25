@@ -10,7 +10,8 @@
 {
     <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content shadow">
+            <EditForm EditContext="EditContext" OnValidSubmit="HandleValidSubmitAsync" class="modal-content shadow rule-definition-editor-form">
+                <DataAnnotationsValidator />
                 <div class="modal-header">
                     <div>
                         <h2 class="modal-title h4 mb-1">@(IsEditMode ? "Edit authored rule" : "Create authored rule")</h2>
@@ -19,9 +20,7 @@
                     <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
                 </div>
 
-                <EditForm EditContext="EditContext" OnValidSubmit="HandleValidSubmitAsync">
-                    <DataAnnotationsValidator />
-                    <div class="modal-body d-flex flex-column gap-4">
+                <div class="modal-body d-flex flex-column gap-4">
                         @if (!string.IsNullOrWhiteSpace(LoadError))
                         {
                             <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-load-error">@LoadError</div>
@@ -167,12 +166,11 @@
                         }
                     </div>
 
-                    <div class="modal-footer">
-                        <button class="btn btn-outline-secondary" type="button" @onclick="CloseAsync" disabled="@IsSubmitting">Cancel</button>
-                        <button class="btn btn-primary" type="submit" data-testid="save-rule-button" disabled="@IsSubmitting || IsCatalogLoading">@(IsSubmitting ? "Saving..." : (IsEditMode ? "Save changes" : "Save authored rule"))</button>
-                    </div>
-                </EditForm>
-            </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseAsync" disabled="@IsSubmitting">Cancel</button>
+                    <button class="btn btn-primary" type="submit" data-testid="save-rule-button" disabled="@IsSubmitting || IsCatalogLoading">@(IsSubmitting ? "Saving..." : (IsEditMode ? "Save changes" : "Save authored rule"))</button>
+                </div>
+            </EditForm>
         </div>
     </div>
 
