@@ -79,7 +79,7 @@ Plans:
 - [x] 04-02-PLAN.md — Add coverage run, project summary, and class coverage persistence schema.
 - [x] 04-03-PLAN.md — Persist normalized coverage results and expose latest-run DTO retrieval.
 - [x] 04-04-PLAN.md — Wire manual coverage run orchestration from registered solutions to persisted results.
-- [ ] 04-05-PLAN.md — Build the `/analysis/coverage` UI for manual runs, project summaries, and class rows.
+- [x] 04-05-PLAN.md — Build the `/analysis/coverage` UI for manual runs, project summaries, and class rows.
 - [ ] 04-06-PLAN.md — Verify the completed coverage-analysis workflow in the running app.
 
 ### Phase 5: Quality Score Dashboard
@@ -125,5 +125,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
 | 2. User-Authored Rule Definitions | 3/3 | Complete | 2026-04-25 |
 | 3. Rule Analysis Review | 6/6 | Complete | 2026-04-25 |
-| 4. Coverage Analysis Review | 4/6 | In Progress | - |
+| 4. Coverage Analysis Review | 5/6 | In Progress | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |
