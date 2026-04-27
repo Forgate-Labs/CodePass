@@ -1,4 +1,5 @@
 @page "/analysis/coverage"
+@using CodePass.Web.Components.CoverageAnalysis
 @using CodePass.Web.Data.Entities
 @using CodePass.Web.Services.CoverageAnalysis
 @using CodePass.Web.Services.Solutions
@@ -114,42 +115,9 @@
                     </div>
                 </div>
             }
-            else if (LatestRun is null)
-            {
-                <div class="card shadow-sm border-0" data-testid="coverage-analysis-no-results">
-                    <div class="card-body p-4 text-center">
-                        <h2 class="h4 mb-2">No coverage-analysis runs yet</h2>
-                        <p class="text-body-secondary mb-0">Run coverage analysis to see normalized project and class coverage here.</p>
-                    </div>
-                </div>
-            }
             else
             {
-                <section class="card shadow-sm border-0" aria-labelledby="coverage-analysis-latest-heading" data-testid="coverage-analysis-latest-run">
-                    <div class="card-body">
-                        <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3 mb-3">
-                            <div>
-                                <h2 class="h4 mb-1" id="coverage-analysis-latest-heading">Latest coverage run</h2>
-                                <p class="text-body-secondary mb-0">Normalized results for @SelectedSolution.DisplayName.</p>
-                            </div>
-                            <span class="badge @GetCoverageStatusBadgeClass(LatestRun.Status)" data-testid="coverage-run-status">@LatestRun.Status</span>
-                        </div>
-
-                        <dl class="row small mb-0" data-testid="coverage-run-summary">
-                            <dt class="col-sm-4 text-body-secondary">Projects</dt>
-                            <dd class="col-sm-8 mb-2">@LatestRun.ProjectCount</dd>
-
-                            <dt class="col-sm-4 text-body-secondary">Classes</dt>
-                            <dd class="col-sm-8 mb-2">@LatestRun.ClassCount</dd>
-
-                            <dt class="col-sm-4 text-body-secondary">Line coverage</dt>
-                            <dd class="col-sm-8 mb-2">@FormatPercent(LatestRun.LineCoveragePercent)</dd>
-
-                            <dt class="col-sm-4 text-body-secondary">Branch coverage</dt>
-                            <dd class="col-sm-8 mb-0">@FormatPercent(LatestRun.BranchCoveragePercent)</dd>
-                        </dl>
-                    </div>
-                </section>
+                <CoverageAnalysisResults Run="LatestRun" />
             }
         }
     }
@@ -274,15 +242,4 @@
             _ => "text-bg-secondary"
         };
 
-    private static string GetCoverageStatusBadgeClass(CoverageAnalysisRunStatus status)
-        => status switch
-        {
-            CoverageAnalysisRunStatus.Succeeded => "text-bg-success",
-            CoverageAnalysisRunStatus.Failed => "text-bg-danger",
-            CoverageAnalysisRunStatus.Running => "text-bg-warning",
-            _ => "text-bg-secondary"
-        };
-
-    private static string FormatPercent(double value)
-        => $"{value:0.0}%";
 }

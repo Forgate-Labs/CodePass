@@ -1,0 +1,159 @@
+@using CodePass.Web.Data.Entities
+@using CodePass.Web.Services.CoverageAnalysis
+
+<section class="card shadow-sm border-0" aria-labelledby="coverage-analysis-results-heading" data-testid="coverage-analysis-results">
+    <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h4 mb-1" id="coverage-analysis-results-heading">Latest coverage results</h2>
+                <p class="text-body-secondary mb-0">Review the most recent manual coverage-analysis run for the selected solution.</p>
+            </div>
+
+            @if (Run is not null)
+            {
+                <span class="badge @GetStatusBadgeClass(Run.Status)" data-testid="coverage-run-status">@Run.Status</span>
+            }
+        </div>
+
+        @if (Run is null)
+        {
+            <div class="border rounded-3 p-4 text-center" data-testid="coverage-analysis-no-results">
+                <h3 class="h5 mb-2">No coverage-analysis runs yet</h3>
+                <p class="text-body-secondary mb-0">Run coverage analysis to see normalized project and class coverage here.</p>
+            </div>
+        }
+        else
+        {
+            <dl class="row small mb-3" data-testid="coverage-run-summary">
+                <dt class="col-sm-4 text-body-secondary">Started</dt>
+                <dd class="col-sm-8 mb-2" data-testid="coverage-run-started">@FormatDateTime(Run.StartedAtUtc)</dd>
+
+                <dt class="col-sm-4 text-body-secondary">Completed</dt>
+                <dd class="col-sm-8 mb-2" data-testid="coverage-run-completed">@(Run.CompletedAtUtc is null ? "Not completed" : FormatDateTime(Run.CompletedAtUtc.Value))</dd>
+
+                <dt class="col-sm-4 text-body-secondary">Projects</dt>
+                <dd class="col-sm-8 mb-2" data-testid="coverage-project-count">@Run.ProjectCount</dd>
+
+                <dt class="col-sm-4 text-body-secondary">Classes</dt>
+                <dd class="col-sm-8 mb-2" data-testid="coverage-class-count">@Run.ClassCount</dd>
+
+                <dt class="col-sm-4 text-body-secondary">Line coverage</dt>
+                <dd class="col-sm-8 mb-2" data-testid="coverage-line-percent">@FormatCoverage(Run.CoveredLineCount, Run.TotalLineCount, Run.LineCoveragePercent)</dd>
+
+                <dt class="col-sm-4 text-body-secondary">Branch coverage</dt>
+                <dd class="col-sm-8 mb-0" data-testid="coverage-branch-percent">@FormatCoverage(Run.CoveredBranchCount, Run.TotalBranchCount, Run.BranchCoveragePercent)</dd>
+            </dl>
+
+            @if (Run.Status == CoverageAnalysisRunStatus.Failed && !string.IsNullOrWhiteSpace(Run.ErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert" data-testid="coverage-run-error-message">
+                    @Run.ErrorMessage
+                </div>
+            }
+            else if (Run.Status == CoverageAnalysisRunStatus.Succeeded && Run.ClassCoverages.Count == 0)
+            {
+                <div class="alert alert-success" role="status" data-testid="coverage-zero-class-success">
+                    Coverage analysis completed successfully. No class-level coverage rows were produced for this solution.
+                </div>
+            }
+
+            @if (Run.ProjectSummaries.Count > 0)
+            {
+                <section class="mb-4" aria-labelledby="coverage-project-summaries-heading" data-testid="coverage-project-summaries">
+                    <h3 class="h5 mb-3" id="coverage-project-summaries-heading">Project summaries</h3>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Project</th>
+                                    <th scope="col">Lines</th>
+                                    <th scope="col">Line %</th>
+                                    <th scope="col">Branches</th>
+                                    <th scope="col">Branch %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var project in Run.ProjectSummaries)
+                                {
+                                    <tr data-testid="coverage-project-row">
+                                        <th scope="row" data-testid="coverage-project-name">@project.ProjectName</th>
+                                        <td data-testid="coverage-project-lines">@project.CoveredLineCount/@project.TotalLineCount</td>
+                                        <td data-testid="coverage-project-line-percent">@FormatPercent(project.LineCoveragePercent)</td>
+                                        <td data-testid="coverage-project-branches">@project.CoveredBranchCount/@project.TotalBranchCount</td>
+                                        <td data-testid="coverage-project-branch-percent">@FormatPercent(project.BranchCoveragePercent)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            }
+
+            <section aria-labelledby="coverage-class-rows-heading" data-testid="coverage-class-coverages">
+                <h3 class="h5 mb-3" id="coverage-class-rows-heading">Class coverage</h3>
+
+                @if (Run.ClassCoverages.Count == 0)
+                {
+                    <div class="border rounded-3 p-3 text-body-secondary" data-testid="coverage-no-class-rows">
+                        No class-level coverage rows are available for this run.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Project</th>
+                                    <th scope="col">Class</th>
+                                    <th scope="col">File path</th>
+                                    <th scope="col">Lines</th>
+                                    <th scope="col">Line %</th>
+                                    <th scope="col">Branches</th>
+                                    <th scope="col">Branch %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var classCoverage in Run.ClassCoverages)
+                                {
+                                    <tr data-testid="coverage-class-row">
+                                        <td data-testid="coverage-class-project">@classCoverage.ProjectName</td>
+                                        <th scope="row" data-testid="coverage-class-name">@classCoverage.ClassName</th>
+                                        <td class="text-break" data-testid="coverage-class-file-path">@classCoverage.FilePath</td>
+                                        <td data-testid="coverage-class-lines">@classCoverage.CoveredLineCount/@classCoverage.TotalLineCount</td>
+                                        <td data-testid="coverage-class-line-percent">@FormatPercent(classCoverage.LineCoveragePercent)</td>
+                                        <td data-testid="coverage-class-branches">@classCoverage.CoveredBranchCount/@classCoverage.TotalBranchCount</td>
+                                        <td data-testid="coverage-class-branch-percent">@FormatPercent(classCoverage.BranchCoveragePercent)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public CoverageAnalysisRunDto? Run { get; set; }
+
+    private static string FormatDateTime(DateTimeOffset dateTime)
+        => dateTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private static string FormatCoverage(int covered, int total, double percent)
+        => $"{covered}/{total} ({FormatPercent(percent)})";
+
+    private static string FormatPercent(double value)
+        => $"{value:0.0}%";
+
+    private static string GetStatusBadgeClass(CoverageAnalysisRunStatus status)
+        => status switch
+        {
+            CoverageAnalysisRunStatus.Succeeded => "text-bg-success",
+            CoverageAnalysisRunStatus.Failed => "text-bg-danger",
+            CoverageAnalysisRunStatus.Running => "text-bg-warning",
+            _ => "text-bg-secondary"
+        };
+}
