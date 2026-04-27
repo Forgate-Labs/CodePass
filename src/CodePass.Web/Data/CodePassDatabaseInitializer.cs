@@ -126,6 +126,101 @@ public static class CodePassDatabaseInitializer
         await dbContext.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS \"IX_RuleAnalysisViolations_RuleCode\" ON \"RuleAnalysisViolations\" (\"RuleCode\");",
             cancellationToken);
+
+        if (!await TableExistsAsync(dbContext, "CoverageAnalysisRuns", cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "CoverageAnalysisRuns" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_CoverageAnalysisRuns" PRIMARY KEY,
+                    "RegisteredSolutionId" TEXT NOT NULL,
+                    "Status" TEXT NOT NULL,
+                    "StartedAtUtc" TEXT NOT NULL,
+                    "CompletedAtUtc" TEXT NULL,
+                    "ProjectCount" INTEGER NOT NULL,
+                    "ClassCount" INTEGER NOT NULL,
+                    "CoveredLineCount" INTEGER NOT NULL,
+                    "TotalLineCount" INTEGER NOT NULL,
+                    "LineCoveragePercent" REAL NOT NULL,
+                    "CoveredBranchCount" INTEGER NOT NULL,
+                    "TotalBranchCount" INTEGER NOT NULL,
+                    "BranchCoveragePercent" REAL NOT NULL,
+                    "ErrorMessage" TEXT NULL,
+                    CONSTRAINT "FK_CoverageAnalysisRuns_RegisteredSolutions_RegisteredSolutionId" FOREIGN KEY ("RegisteredSolutionId") REFERENCES "RegisteredSolutions" ("Id") ON DELETE CASCADE
+                );
+                """,
+                cancellationToken);
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageAnalysisRuns_RegisteredSolutionId\" ON \"CoverageAnalysisRuns\" (\"RegisteredSolutionId\");",
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageAnalysisRuns_StartedAtUtc\" ON \"CoverageAnalysisRuns\" (\"StartedAtUtc\");",
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageAnalysisRuns_RegisteredSolutionId_StartedAtUtc\" ON \"CoverageAnalysisRuns\" (\"RegisteredSolutionId\", \"StartedAtUtc\");",
+            cancellationToken);
+
+        if (!await TableExistsAsync(dbContext, "CoverageProjectSummaries", cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "CoverageProjectSummaries" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_CoverageProjectSummaries" PRIMARY KEY,
+                    "CoverageAnalysisRunId" TEXT NOT NULL,
+                    "ProjectName" TEXT NOT NULL,
+                    "CoveredLineCount" INTEGER NOT NULL,
+                    "TotalLineCount" INTEGER NOT NULL,
+                    "LineCoveragePercent" REAL NOT NULL,
+                    "CoveredBranchCount" INTEGER NOT NULL,
+                    "TotalBranchCount" INTEGER NOT NULL,
+                    "BranchCoveragePercent" REAL NOT NULL,
+                    CONSTRAINT "FK_CoverageProjectSummaries_CoverageAnalysisRuns_CoverageAnalysisRunId" FOREIGN KEY ("CoverageAnalysisRunId") REFERENCES "CoverageAnalysisRuns" ("Id") ON DELETE CASCADE
+                );
+                """,
+                cancellationToken);
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageProjectSummaries_CoverageAnalysisRunId\" ON \"CoverageProjectSummaries\" (\"CoverageAnalysisRunId\");",
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageProjectSummaries_ProjectName\" ON \"CoverageProjectSummaries\" (\"ProjectName\");",
+            cancellationToken);
+
+        if (!await TableExistsAsync(dbContext, "CoverageClassCoverages", cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "CoverageClassCoverages" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_CoverageClassCoverages" PRIMARY KEY,
+                    "CoverageAnalysisRunId" TEXT NOT NULL,
+                    "ProjectName" TEXT NOT NULL,
+                    "ClassName" TEXT NOT NULL,
+                    "FilePath" TEXT NOT NULL,
+                    "CoveredLineCount" INTEGER NOT NULL,
+                    "TotalLineCount" INTEGER NOT NULL,
+                    "LineCoveragePercent" REAL NOT NULL,
+                    "CoveredBranchCount" INTEGER NOT NULL,
+                    "TotalBranchCount" INTEGER NOT NULL,
+                    "BranchCoveragePercent" REAL NOT NULL,
+                    CONSTRAINT "FK_CoverageClassCoverages_CoverageAnalysisRuns_CoverageAnalysisRunId" FOREIGN KEY ("CoverageAnalysisRunId") REFERENCES "CoverageAnalysisRuns" ("Id") ON DELETE CASCADE
+                );
+                """,
+                cancellationToken);
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageClassCoverages_CoverageAnalysisRunId\" ON \"CoverageClassCoverages\" (\"CoverageAnalysisRunId\");",
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_CoverageClassCoverages_ClassName\" ON \"CoverageClassCoverages\" (\"ClassName\");",
+            cancellationToken);
     }
 
     private static async Task<bool> TableExistsAsync(CodePassDbContext dbContext, string tableName, CancellationToken cancellationToken)
