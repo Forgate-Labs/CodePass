@@ -23,7 +23,9 @@ builder.Services.AddScoped<ISolutionRuleSelectionService, SolutionRuleSelectionS
 builder.Services.AddScoped<IRuleAnalyzer, RoslynRuleAnalyzer>();
 builder.Services.AddScoped<IRuleAnalysisResultService, RuleAnalysisResultService>();
 builder.Services.AddScoped<IRuleAnalysisRunService, RuleAnalysisRunService>();
+builder.Services.AddScoped<ICoverageAnalyzer, DotNetCoverageAnalyzer>();
 builder.Services.AddScoped<ICoverageAnalysisResultService, CoverageAnalysisResultService>();
+builder.Services.AddScoped<ICoverageAnalysisRunService, CoverageAnalysisRunService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
