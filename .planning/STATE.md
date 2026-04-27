@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-04-27T19:00:45.629Z"
-last_activity: 2026-04-27 — Completed Phase 4 coverage result persistence service with normalized snapshots and SQLite-safe latest-run retrieval.
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-04-27T19:06:18.989Z"
+last_activity: 2026-04-27 — Completed Phase 4 manual coverage run orchestration with scoped DI and regression coverage.
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 89
 ---
 
 # Project State
@@ -26,17 +26,17 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 4 of 5 (Coverage Analysis Review)
-Plan: 04 of 6 (next: wire manual coverage run orchestration)
-Status: Phase 4 in progress; ready for Plan 04-04
-Last activity: 2026-04-27 — Completed Phase 4 coverage result persistence service with normalized snapshots and SQLite-safe latest-run retrieval.
+Plan: 05 of 6 (next: build `/analysis/coverage` UI)
+Status: Phase 4 in progress; ready for Plan 04-05
+Last activity: 2026-04-27 — Completed Phase 4 manual coverage run orchestration with scoped DI and regression coverage.
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
-- Average duration: 16.6 min
+- Total plans completed: 16
+- Average duration: 15.9 min
 - Total execution time: 4.2 hours
 
 **By Phase:**
@@ -46,10 +46,10 @@ Progress: [████████░░] 83%
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
 | 02-user-authored-rule-definitions | 3 | 125 min | 41.7 min |
 | 03-rule-analysis-review | 6 | 49 min | 8.2 min |
-| 04-coverage-analysis-review | 3 | 9 min | 3.0 min |
+| 04-coverage-analysis-review | 4 | 11 min | 2.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-rule-analysis-review-05 (3 min), 03-rule-analysis-review-06 (33 min), 04-coverage-analysis-review-01 (3 min), 04-coverage-analysis-review-02 (3 min), 04-coverage-analysis-review-03 (3 min)
+- Last 5 plans: 03-rule-analysis-review-06 (33 min), 04-coverage-analysis-review-01 (3 min), 04-coverage-analysis-review-02 (3 min), 04-coverage-analysis-review-03 (3 min), 04-coverage-analysis-review-04 (2 min)
 - Trend: Phase 4 continues with focused backend coverage-analysis plans and fast automated verification.
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
@@ -66,6 +66,7 @@ Progress: [████████░░] 83%
 | Phase 04-coverage-analysis-review P01 | 3 min | 3 tasks | 5 files |
 | Phase 04-coverage-analysis-review P02 | 3 min | 3 tasks | 7 files |
 | Phase 04-coverage-analysis-review P03 | 3 min | 3 tasks | 5 files |
+| Phase 04-coverage-analysis-review P04 | 2 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,9 @@ Recent decisions affecting current work:
 - [Phase 04-coverage-analysis-review]: Keep CoverageAnalysisResultService persistence-focused so coverage orchestration and dotnet test execution remain separate concerns for Plan 04-04. — Maintains separation between analyzer execution, run orchestration, and result persistence.
 - [Phase 04-coverage-analysis-review]: Materialize solution-filtered coverage runs before ordering by StartedAtUtc and Id so latest-run lookup remains SQLite-safe. — Avoids the known SQLite DateTimeOffset ordering translation issue while still filtering candidates in the database.
 - [Phase 04-coverage-analysis-review]: Expose immutable UI-facing coverage DTOs with ordered project summaries and class rows instead of returning EF entities. — Keeps UI and orchestrator callers decoupled from EF tracking and persistence schema details.
+- [Phase 04-coverage-analysis-review]: Expose manual coverage-analysis execution through a scoped ICoverageAnalysisRunService so UI callers do not compose registered-solution lookup, analyzer execution, and result persistence directly. — Plan 04-05 needs a single backend operation for the /analysis/coverage UI, and this keeps orchestration separate from persistence and dotnet coverage process execution concerns.
+- [Phase 04-coverage-analysis-review]: Treat non-valid registered solutions as persisted failed coverage runs with readable status messages, while unknown solution ids remain clear InvalidOperationException failures. — The UI needs durable failed run feedback for registered-but-not-valid solutions, but unknown ids indicate caller or state mismatch and should fail clearly.
+- [Phase 04-coverage-analysis-review]: Keep coverage process execution inside DotNetCoverageAnalyzer and result storage inside CoverageAnalysisResultService; the run service remains a thin orchestrator with no scheduling or CI trigger. — Maintains the Phase 4 manual coverage-review scope and preserves clean boundaries for later UI and dashboard work.
 
 ### Pending Todos
 
@@ -128,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27T19:00:45.627Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-04-27T19:06:18.987Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
