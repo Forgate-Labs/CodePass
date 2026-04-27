@@ -61,7 +61,103 @@ public sealed class CodePassDatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ShouldAddSolutionRuleAssignmentsTableWithoutLosingExistingSolutionOrAuthoredRuleData()
+    public async Task InitializeAsync_ShouldCreateCoverageTablesAndIndexesForFreshSqliteDatabase()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"codepass-init-{Guid.NewGuid():N}.db");
+        var connectionString = $"Data Source={databasePath}";
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<CodePassDbContext>()
+                .UseSqlite(connectionString)
+                .Options;
+
+            await using var dbContext = new CodePassDbContext(options);
+            await CodePassDatabaseInitializer.InitializeAsync(dbContext);
+
+            var tableNames = await ReadTableNamesAsync(connectionString);
+            tableNames.Should().Contain("CoverageAnalysisRuns");
+            tableNames.Should().Contain("CoverageProjectSummaries");
+            tableNames.Should().Contain("CoverageClassCoverages");
+
+            var indexNames = await ReadIndexNamesAsync(connectionString);
+            indexNames.Should().Contain("IX_CoverageAnalysisRuns_RegisteredSolutionId");
+            indexNames.Should().Contain("IX_CoverageAnalysisRuns_StartedAtUtc");
+            indexNames.Should().Contain("IX_CoverageAnalysisRuns_RegisteredSolutionId_StartedAtUtc");
+            indexNames.Should().Contain("IX_CoverageProjectSummaries_CoverageAnalysisRunId");
+            indexNames.Should().Contain("IX_CoverageProjectSummaries_ProjectName");
+            indexNames.Should().Contain("IX_CoverageClassCoverages_CoverageAnalysisRunId");
+            indexNames.Should().Contain("IX_CoverageClassCoverages_ClassName");
+
+            var solutionId = Guid.NewGuid();
+            var runId = Guid.NewGuid();
+            dbContext.RegisteredSolutions.Add(new RegisteredSolution
+            {
+                Id = solutionId,
+                DisplayName = "Fresh coverage solution",
+                SolutionPath = "/tmp/fresh-coverage.sln",
+                Status = RegisteredSolutionStatus.Valid,
+                LastValidatedAtUtc = DateTimeOffset.UtcNow,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+            dbContext.CoverageAnalysisRuns.Add(new CoverageAnalysisRun
+            {
+                Id = runId,
+                RegisteredSolutionId = solutionId,
+                Status = CoverageAnalysisRunStatus.Succeeded,
+                StartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2),
+                CompletedAtUtc = DateTimeOffset.UtcNow,
+                ProjectCount = 1,
+                ClassCount = 1,
+                CoveredLineCount = 9,
+                TotalLineCount = 10,
+                LineCoveragePercent = 90,
+                CoveredBranchCount = 3,
+                TotalBranchCount = 4,
+                BranchCoveragePercent = 75
+            });
+            dbContext.CoverageProjectSummaries.Add(new CoverageProjectSummary
+            {
+                Id = Guid.NewGuid(),
+                CoverageAnalysisRunId = runId,
+                ProjectName = "CodePass.Web",
+                CoveredLineCount = 9,
+                TotalLineCount = 10,
+                LineCoveragePercent = 90,
+                CoveredBranchCount = 3,
+                TotalBranchCount = 4,
+                BranchCoveragePercent = 75
+            });
+            dbContext.CoverageClassCoverages.Add(new CoverageClassCoverage
+            {
+                Id = Guid.NewGuid(),
+                CoverageAnalysisRunId = runId,
+                ProjectName = "CodePass.Web",
+                ClassName = "CoverageAnalyzer",
+                FilePath = "src/CodePass.Web/Services/CoverageAnalysis/CoverageAnalyzer.cs",
+                CoveredLineCount = 9,
+                TotalLineCount = 10,
+                LineCoveragePercent = 90,
+                CoveredBranchCount = 3,
+                TotalBranchCount = 4,
+                BranchCoveragePercent = 75
+            });
+
+            await dbContext.SaveChangesAsync();
+
+            (await dbContext.CoverageAnalysisRuns.CountAsync()).Should().Be(1);
+            (await dbContext.CoverageProjectSummaries.CountAsync()).Should().Be(1);
+            (await dbContext.CoverageClassCoverages.CountAsync()).Should().Be(1);
+        }
+        finally
+        {
+            File.Delete(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldAddCoverageTablesWithoutLosingExistingLegacyRuleAnalysisData()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"codepass-init-{Guid.NewGuid():N}.db");
         var connectionString = $"Data Source={databasePath}";
@@ -70,7 +166,14 @@ public sealed class CodePassDatabaseInitializerTests
         {
             var existingSolutionId = Guid.NewGuid();
             var existingRuleId = Guid.NewGuid();
-            await CreateLegacyDatabaseWithAuthoredRulesAsync(connectionString, existingSolutionId, existingRuleId);
+            var existingAssignmentId = Guid.NewGuid();
+            var existingAnalysisRunId = Guid.NewGuid();
+            await CreateLegacyDatabaseWithRuleAnalysisAsync(
+                connectionString,
+                existingSolutionId,
+                existingRuleId,
+                existingAssignmentId,
+                existingAnalysisRunId);
 
             var options = new DbContextOptionsBuilder<CodePassDbContext>()
                 .UseSqlite(connectionString)
@@ -85,57 +188,78 @@ public sealed class CodePassDatabaseInitializerTests
             tableNames.Should().Contain("SolutionRuleAssignments");
             tableNames.Should().Contain("RuleAnalysisRuns");
             tableNames.Should().Contain("RuleAnalysisViolations");
+            tableNames.Should().Contain("CoverageAnalysisRuns");
+            tableNames.Should().Contain("CoverageProjectSummaries");
+            tableNames.Should().Contain("CoverageClassCoverages");
+
+            var indexNames = await ReadIndexNamesAsync(connectionString);
+            indexNames.Should().Contain("IX_CoverageAnalysisRuns_RegisteredSolutionId_StartedAtUtc");
+            indexNames.Should().Contain("IX_CoverageProjectSummaries_CoverageAnalysisRunId");
+            indexNames.Should().Contain("IX_CoverageClassCoverages_CoverageAnalysisRunId");
+            indexNames.Should().Contain("IX_CoverageProjectSummaries_ProjectName");
+            indexNames.Should().Contain("IX_CoverageClassCoverages_ClassName");
 
             (await dbContext.RegisteredSolutions.CountAsync()).Should().Be(1);
             (await dbContext.AuthoredRuleDefinitions.CountAsync()).Should().Be(1);
+            (await dbContext.SolutionRuleAssignments.CountAsync()).Should().Be(1);
+            (await dbContext.RuleAnalysisRuns.CountAsync()).Should().Be(1);
+            (await dbContext.RuleAnalysisViolations.CountAsync()).Should().Be(1);
 
-            dbContext.SolutionRuleAssignments.Add(new SolutionRuleAssignment
+            var coverageRunId = Guid.NewGuid();
+            dbContext.CoverageAnalysisRuns.Add(new CoverageAnalysisRun
             {
-                Id = Guid.NewGuid(),
+                Id = coverageRunId,
                 RegisteredSolutionId = existingSolutionId,
-                AuthoredRuleDefinitionId = existingRuleId,
-                IsEnabled = true,
-                CreatedAtUtc = DateTimeOffset.UtcNow,
-                UpdatedAtUtc = DateTimeOffset.UtcNow
-            });
-
-            var analysisRun = new RuleAnalysisRun
-            {
-                Id = Guid.NewGuid(),
-                RegisteredSolutionId = existingSolutionId,
-                Status = RuleAnalysisRunStatus.Succeeded,
+                Status = CoverageAnalysisRunStatus.Succeeded,
                 StartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
                 CompletedAtUtc = DateTimeOffset.UtcNow,
-                RuleCount = 1,
-                TotalViolations = 1
-            };
-            dbContext.RuleAnalysisRuns.Add(analysisRun);
-            dbContext.RuleAnalysisViolations.Add(new RuleAnalysisViolation
+                ProjectCount = 1,
+                ClassCount = 1,
+                CoveredLineCount = 12,
+                TotalLineCount = 16,
+                LineCoveragePercent = 75,
+                CoveredBranchCount = 2,
+                TotalBranchCount = 8,
+                BranchCoveragePercent = 25
+            });
+            dbContext.CoverageProjectSummaries.Add(new CoverageProjectSummary
             {
                 Id = Guid.NewGuid(),
-                RuleAnalysisRunId = analysisRun.Id,
-                AuthoredRuleDefinitionId = existingRuleId,
-                RuleCode = "CP3000",
-                RuleTitle = "Existing authored rule",
-                RuleKind = "syntax_presence",
-                RuleSeverity = RuleSeverity.Error,
-                Message = "Use explicit type instead of var.",
-                FilePath = "src/Legacy.cs",
-                StartLine = 10,
-                StartColumn = 5,
-                EndLine = 10,
-                EndColumn = 8
+                CoverageAnalysisRunId = coverageRunId,
+                ProjectName = "Legacy.Web",
+                CoveredLineCount = 12,
+                TotalLineCount = 16,
+                LineCoveragePercent = 75,
+                CoveredBranchCount = 2,
+                TotalBranchCount = 8,
+                BranchCoveragePercent = 25
+            });
+            dbContext.CoverageClassCoverages.Add(new CoverageClassCoverage
+            {
+                Id = Guid.NewGuid(),
+                CoverageAnalysisRunId = coverageRunId,
+                ProjectName = "Legacy.Web",
+                ClassName = "LegacyController",
+                FilePath = "src/Legacy.Web/LegacyController.cs",
+                CoveredLineCount = 12,
+                TotalLineCount = 16,
+                LineCoveragePercent = 75,
+                CoveredBranchCount = 2,
+                TotalBranchCount = 8,
+                BranchCoveragePercent = 25
             });
 
             await dbContext.SaveChangesAsync();
 
-            (await dbContext.SolutionRuleAssignments.CountAsync()).Should().Be(1);
-            (await dbContext.RuleAnalysisRuns.CountAsync()).Should().Be(1);
-            (await dbContext.RuleAnalysisViolations.CountAsync()).Should().Be(1);
+            (await dbContext.CoverageAnalysisRuns.CountAsync()).Should().Be(1);
+            (await dbContext.CoverageProjectSummaries.CountAsync()).Should().Be(1);
+            (await dbContext.CoverageClassCoverages.CountAsync()).Should().Be(1);
             var existingSolution = await dbContext.RegisteredSolutions.SingleAsync();
-            existingSolution.DisplayName.Should().Be("Legacy solution with authored rules");
+            existingSolution.DisplayName.Should().Be("Legacy solution with rule analysis");
             var existingRule = await dbContext.AuthoredRuleDefinitions.SingleAsync();
             existingRule.Code.Should().Be("CP3000");
+            var existingViolation = await dbContext.RuleAnalysisViolations.SingleAsync();
+            existingViolation.FilePath.Should().Be("src/Legacy.cs");
         }
         finally
         {
@@ -164,20 +288,25 @@ public sealed class CodePassDatabaseInitializerTests
         await legacyContext.SaveChangesAsync();
     }
 
-    private static async Task CreateLegacyDatabaseWithAuthoredRulesAsync(string connectionString, Guid solutionId, Guid ruleId)
+    private static async Task CreateLegacyDatabaseWithRuleAnalysisAsync(
+        string connectionString,
+        Guid solutionId,
+        Guid ruleId,
+        Guid assignmentId,
+        Guid analysisRunId)
     {
-        var options = new DbContextOptionsBuilder<LegacyCodePassDbContextWithAuthoredRules>()
+        var options = new DbContextOptionsBuilder<LegacyCodePassDbContextWithRuleAnalysis>()
             .UseSqlite(connectionString)
             .Options;
 
-        await using var legacyContext = new LegacyCodePassDbContextWithAuthoredRules(options);
+        await using var legacyContext = new LegacyCodePassDbContextWithRuleAnalysis(options);
         await legacyContext.Database.EnsureCreatedAsync();
         var now = DateTimeOffset.UtcNow;
         legacyContext.RegisteredSolutions.Add(new RegisteredSolution
         {
             Id = solutionId,
-            DisplayName = "Legacy solution with authored rules",
-            SolutionPath = "/tmp/legacy-with-authored-rules.sln",
+            DisplayName = "Legacy solution with rule analysis",
+            SolutionPath = "/tmp/legacy-with-rule-analysis.sln",
             Status = RegisteredSolutionStatus.Valid,
             LastValidatedAtUtc = now,
             CreatedAtUtc = now,
@@ -199,6 +328,41 @@ public sealed class CodePassDatabaseInitializerTests
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
+        legacyContext.SolutionRuleAssignments.Add(new SolutionRuleAssignment
+        {
+            Id = assignmentId,
+            RegisteredSolutionId = solutionId,
+            AuthoredRuleDefinitionId = ruleId,
+            IsEnabled = true,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        legacyContext.RuleAnalysisRuns.Add(new RuleAnalysisRun
+        {
+            Id = analysisRunId,
+            RegisteredSolutionId = solutionId,
+            Status = RuleAnalysisRunStatus.Succeeded,
+            StartedAtUtc = now.AddMinutes(-1),
+            CompletedAtUtc = now,
+            RuleCount = 1,
+            TotalViolations = 1
+        });
+        legacyContext.RuleAnalysisViolations.Add(new RuleAnalysisViolation
+        {
+            Id = Guid.NewGuid(),
+            RuleAnalysisRunId = analysisRunId,
+            AuthoredRuleDefinitionId = ruleId,
+            RuleCode = "CP3000",
+            RuleTitle = "Existing authored rule",
+            RuleKind = "syntax_presence",
+            RuleSeverity = RuleSeverity.Error,
+            Message = "Use explicit type instead of var.",
+            FilePath = "src/Legacy.cs",
+            StartLine = 10,
+            StartColumn = 5,
+            EndLine = 10,
+            EndColumn = 8
+        });
         await legacyContext.SaveChangesAsync();
     }
 
@@ -208,6 +372,23 @@ public sealed class CodePassDatabaseInitializerTests
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;";
+        await using var reader = await command.ExecuteReaderAsync();
+
+        var names = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        return names;
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadIndexNamesAsync(string connectionString)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name;";
         await using var reader = await command.ExecuteReaderAsync();
 
         var names = new List<string>();
@@ -229,16 +410,25 @@ public sealed class CodePassDatabaseInitializerTests
         }
     }
 
-    private sealed class LegacyCodePassDbContextWithAuthoredRules(DbContextOptions<LegacyCodePassDbContextWithAuthoredRules> options) : DbContext(options)
+    private sealed class LegacyCodePassDbContextWithRuleAnalysis(DbContextOptions<LegacyCodePassDbContextWithRuleAnalysis> options) : DbContext(options)
     {
         public DbSet<RegisteredSolution> RegisteredSolutions => Set<RegisteredSolution>();
 
         public DbSet<AuthoredRuleDefinition> AuthoredRuleDefinitions => Set<AuthoredRuleDefinition>();
 
+        public DbSet<SolutionRuleAssignment> SolutionRuleAssignments => Set<SolutionRuleAssignment>();
+
+        public DbSet<RuleAnalysisRun> RuleAnalysisRuns => Set<RuleAnalysisRun>();
+
+        public DbSet<RuleAnalysisViolation> RuleAnalysisViolations => Set<RuleAnalysisViolation>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             ConfigureRegisteredSolution(modelBuilder);
             ConfigureAuthoredRuleDefinition(modelBuilder);
+            ConfigureSolutionRuleAssignment(modelBuilder);
+            ConfigureRuleAnalysisRun(modelBuilder);
+            ConfigureRuleAnalysisViolation(modelBuilder);
         }
     }
 
@@ -271,5 +461,67 @@ public sealed class CodePassDatabaseInitializerTests
         authoredRuleDefinition.Property(rule => rule.IsEnabled).IsRequired();
         authoredRuleDefinition.HasIndex(rule => rule.Code).IsUnique();
         authoredRuleDefinition.HasIndex(rule => rule.RuleKind);
+    }
+
+    private static void ConfigureSolutionRuleAssignment(ModelBuilder modelBuilder)
+    {
+        var solutionRuleAssignment = modelBuilder.Entity<SolutionRuleAssignment>();
+
+        solutionRuleAssignment.HasKey(assignment => assignment.Id);
+        solutionRuleAssignment.Property(assignment => assignment.IsEnabled).IsRequired();
+        solutionRuleAssignment.HasOne<RegisteredSolution>()
+            .WithMany()
+            .HasForeignKey(assignment => assignment.RegisteredSolutionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        solutionRuleAssignment.HasOne<AuthoredRuleDefinition>()
+            .WithMany()
+            .HasForeignKey(assignment => assignment.AuthoredRuleDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        solutionRuleAssignment.HasIndex(assignment => new { assignment.RegisteredSolutionId, assignment.AuthoredRuleDefinitionId })
+            .IsUnique();
+    }
+
+    private static void ConfigureRuleAnalysisRun(ModelBuilder modelBuilder)
+    {
+        var ruleAnalysisRun = modelBuilder.Entity<RuleAnalysisRun>();
+
+        ruleAnalysisRun.HasKey(run => run.Id);
+        ruleAnalysisRun.Property(run => run.Status).HasConversion<string>().IsRequired();
+        ruleAnalysisRun.Property(run => run.RuleCount).IsRequired();
+        ruleAnalysisRun.Property(run => run.TotalViolations).IsRequired();
+        ruleAnalysisRun.Property(run => run.ErrorMessage);
+        ruleAnalysisRun.HasOne<RegisteredSolution>()
+            .WithMany()
+            .HasForeignKey(run => run.RegisteredSolutionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        ruleAnalysisRun.HasMany(run => run.Violations)
+            .WithOne(violation => violation.RuleAnalysisRun)
+            .HasForeignKey(violation => violation.RuleAnalysisRunId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        ruleAnalysisRun.HasIndex(run => run.RegisteredSolutionId);
+        ruleAnalysisRun.HasIndex(run => run.StartedAtUtc);
+    }
+
+    private static void ConfigureRuleAnalysisViolation(ModelBuilder modelBuilder)
+    {
+        var ruleAnalysisViolation = modelBuilder.Entity<RuleAnalysisViolation>();
+
+        ruleAnalysisViolation.HasKey(violation => violation.Id);
+        ruleAnalysisViolation.Property(violation => violation.RuleCode).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.RuleTitle).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.RuleKind).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.RuleSeverity).HasConversion<string>().IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.Message).IsRequired();
+        ruleAnalysisViolation.Property(violation => violation.FilePath).IsRequired();
+        ruleAnalysisViolation.HasOne<AuthoredRuleDefinition>()
+            .WithMany()
+            .HasForeignKey(violation => violation.AuthoredRuleDefinitionId)
+            .OnDelete(DeleteBehavior.SetNull);
+        ruleAnalysisViolation.HasIndex(violation => violation.RuleAnalysisRunId);
+        ruleAnalysisViolation.HasIndex(violation => violation.RuleCode);
     }
 }
