@@ -90,7 +90,25 @@
             }
 
             <section aria-labelledby="coverage-class-rows-heading" data-testid="coverage-class-coverages">
-                <h3 class="h5 mb-3" id="coverage-class-rows-heading">Class coverage</h3>
+                <div class="d-flex flex-column flex-sm-row align-items-sm-start justify-content-between gap-2 mb-2">
+                    <div>
+                        <h3 class="h5 mb-1" id="coverage-class-rows-heading">Class coverage</h3>
+                        @if (Run.ClassCoverages.Count > 0 && !_showClassDetails)
+                        {
+                            <p class="small text-body-secondary mb-0" data-testid="coverage-class-details-hidden">
+                                Class-level details are hidden by default. View details to inspect 10 classes per page.
+                            </p>
+                        }
+                    </div>
+
+                    @if (Run.ClassCoverages.Count > 0)
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-testid="coverage-class-details-toggle" @onclick="ToggleClassDetails">
+                            @(_showClassDetails ? "Hide class details" : "View class details")
+                            <span class="badge text-bg-secondary ms-2" data-testid="coverage-class-details-count">@Run.ClassCoverages.Count</span>
+                        </button>
+                    }
+                </div>
 
                 @if (Run.ClassCoverages.Count == 0)
                 {
@@ -98,36 +116,46 @@
                         No class-level coverage rows are available for this run.
                     </div>
                 }
-                else
+                else if (_showClassDetails)
                 {
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
+                        <table class="table table-sm align-middle mb-0" data-testid="coverage-class-table">
                             <thead>
                                 <tr>
-                                    <th scope="col">Project</th>
-                                    <th scope="col">Class</th>
-                                    <th scope="col">File path</th>
-                                    <th scope="col">Lines</th>
-                                    <th scope="col">Line %</th>
-                                    <th scope="col">Branches</th>
-                                    <th scope="col">Branch %</th>
+                                    <th class="py-1" scope="col">Project</th>
+                                    <th class="py-1" scope="col">Class</th>
+                                    <th class="py-1" scope="col">File path</th>
+                                    <th class="py-1" scope="col">Lines</th>
+                                    <th class="py-1" scope="col">Line %</th>
+                                    <th class="py-1" scope="col">Branches</th>
+                                    <th class="py-1" scope="col">Branch %</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var classCoverage in Run.ClassCoverages)
+                                @foreach (var classCoverage in VisibleClassCoverages)
                                 {
                                     <tr data-testid="coverage-class-row">
-                                        <td data-testid="coverage-class-project">@classCoverage.ProjectName</td>
-                                        <th scope="row" data-testid="coverage-class-name">@classCoverage.ClassName</th>
-                                        <td class="text-break" data-testid="coverage-class-file-path">@classCoverage.FilePath</td>
-                                        <td data-testid="coverage-class-lines">@classCoverage.CoveredLineCount/@classCoverage.TotalLineCount</td>
-                                        <td data-testid="coverage-class-line-percent">@FormatPercent(classCoverage.LineCoveragePercent)</td>
-                                        <td data-testid="coverage-class-branches">@classCoverage.CoveredBranchCount/@classCoverage.TotalBranchCount</td>
-                                        <td data-testid="coverage-class-branch-percent">@FormatPercent(classCoverage.BranchCoveragePercent)</td>
+                                        <td class="py-1" data-testid="coverage-class-project">@classCoverage.ProjectName</td>
+                                        <th class="py-1" scope="row" data-testid="coverage-class-name">@classCoverage.ClassName</th>
+                                        <td class="py-1 text-break" data-testid="coverage-class-file-path">@classCoverage.FilePath</td>
+                                        <td class="py-1" data-testid="coverage-class-lines">@classCoverage.CoveredLineCount/@classCoverage.TotalLineCount</td>
+                                        <td class="py-1" data-testid="coverage-class-line-percent">@FormatPercent(classCoverage.LineCoveragePercent)</td>
+                                        <td class="py-1" data-testid="coverage-class-branches">@classCoverage.CoveredBranchCount/@classCoverage.TotalBranchCount</td>
+                                        <td class="py-1" data-testid="coverage-class-branch-percent">@FormatPercent(classCoverage.BranchCoveragePercent)</td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mt-2" data-testid="coverage-class-pagination">
+                        <span class="small text-body-secondary" data-testid="coverage-class-page-summary">
+                            Showing @FirstVisibleClassNumber-@LastVisibleClassNumber of @Run.ClassCoverages.Count
+                        </span>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Class coverage pagination">
+                            <button type="button" class="btn btn-outline-secondary" data-testid="coverage-class-previous-page" disabled="@(_classPageIndex == 0)" @onclick="ShowPreviousClassPage">Previous</button>
+                            <button type="button" class="btn btn-outline-secondary" data-testid="coverage-class-next-page" disabled="@(_classPageIndex >= TotalClassPages - 1)" @onclick="ShowNextClassPage">Next</button>
+                        </div>
                     </div>
                 }
             </section>
@@ -136,8 +164,81 @@
 </section>
 
 @code {
+    private const int ClassPageSize = 10;
+
+    private bool _showClassDetails;
+    private int _classPageIndex;
+    private Guid? _lastRunId;
+
     [Parameter]
     public CoverageAnalysisRunDto? Run { get; set; }
+
+    private IEnumerable<CoverageClassCoverageDto> VisibleClassCoverages
+        => Run?.ClassCoverages.Skip(_classPageIndex * ClassPageSize).Take(ClassPageSize) ?? [];
+
+    private int TotalClassPages
+        => Run?.ClassCoverages.Count > 0
+            ? (int)Math.Ceiling(Run.ClassCoverages.Count / (double)ClassPageSize)
+            : 0;
+
+    private int FirstVisibleClassNumber
+        => Run?.ClassCoverages.Count > 0 ? (_classPageIndex * ClassPageSize) + 1 : 0;
+
+    private int LastVisibleClassNumber
+        => Run is null ? 0 : Math.Min(Run.ClassCoverages.Count, (_classPageIndex + 1) * ClassPageSize);
+
+    protected override void OnParametersSet()
+    {
+        var runId = Run?.Id;
+        if (_lastRunId != runId)
+        {
+            _lastRunId = runId;
+            _showClassDetails = false;
+            _classPageIndex = 0;
+        }
+
+        ClampClassPageIndex();
+    }
+
+    private void ToggleClassDetails()
+    {
+        _showClassDetails = !_showClassDetails;
+
+        if (!_showClassDetails)
+        {
+            _classPageIndex = 0;
+            return;
+        }
+
+        ClampClassPageIndex();
+    }
+
+    private void ShowPreviousClassPage()
+    {
+        if (_classPageIndex > 0)
+        {
+            _classPageIndex--;
+        }
+    }
+
+    private void ShowNextClassPage()
+    {
+        if (_classPageIndex < TotalClassPages - 1)
+        {
+            _classPageIndex++;
+        }
+    }
+
+    private void ClampClassPageIndex()
+    {
+        if (TotalClassPages == 0)
+        {
+            _classPageIndex = 0;
+            return;
+        }
+
+        _classPageIndex = Math.Clamp(_classPageIndex, 0, TotalClassPages - 1);
+    }
 
     private static string FormatDateTime(DateTimeOffset dateTime)
         => dateTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm");

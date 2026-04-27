@@ -3,6 +3,7 @@ using CodePass.Web.Components.CoverageAnalysis;
 using CodePass.Web.Data.Entities;
 using CodePass.Web.Services.CoverageAnalysis;
 using FluentAssertions;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace CodePass.Web.Tests.Components;
 
@@ -52,14 +53,23 @@ public sealed class CoverageAnalysisResultsTests : TestContext
     }
 
     [Fact]
-    public void ClassRows_ShouldRenderProjectClassFilePathAndPercentages()
+    public async Task ClassRows_ShouldBeHiddenByDefaultAndRenderCompactRowsAfterToggle()
     {
         var run = CoverageAnalysisComponentTestData.CreateSucceededRun(Guid.NewGuid());
 
         var cut = RenderComponent<CoverageAnalysisResults>(parameters => parameters
             .Add(parameter => parameter.Run, run));
 
+        cut.FindAll("[data-testid='coverage-class-row']").Should().BeEmpty();
+        cut.Find("[data-testid='coverage-class-details-hidden']").TextContent.Should().Contain("hidden by default");
+
+        await cut.Find("[data-testid='coverage-class-details-toggle']").ClickAsync(new MouseEventArgs());
+
+        var table = cut.Find("[data-testid='coverage-class-table']");
+        table.ClassList.Should().Contain("table-sm");
+
         var classRow = cut.Find("[data-testid='coverage-class-row']");
+        classRow.QuerySelectorAll("th, td").Should().OnlyContain(cell => cell.ClassList.Contains("py-1"));
         classRow.TextContent.Should().Contain("CodePass.Web");
         classRow.TextContent.Should().Contain("CoverageAnalysisResultService");
         classRow.TextContent.Should().Contain("src/Services/CoverageAnalysis/CoverageAnalysisResultService.cs");
@@ -67,6 +77,32 @@ public sealed class CoverageAnalysisResultsTests : TestContext
         classRow.TextContent.Should().Contain("80.0%");
         classRow.TextContent.Should().Contain("2/4");
         classRow.TextContent.Should().Contain("50.0%");
+    }
+
+    [Fact]
+    public async Task ClassRows_ShouldPaginateTenAtATimeWhenDetailsShown()
+    {
+        var classCoverages = CoverageAnalysisComponentTestData.CreateClassCoverages(12);
+        var run = CoverageAnalysisComponentTestData.CreateSucceededRun(Guid.NewGuid(), classCoverages: classCoverages);
+
+        var cut = RenderComponent<CoverageAnalysisResults>(parameters => parameters
+            .Add(parameter => parameter.Run, run));
+
+        await cut.Find("[data-testid='coverage-class-details-toggle']").ClickAsync(new MouseEventArgs());
+
+        cut.FindAll("[data-testid='coverage-class-row']").Should().HaveCount(10);
+        cut.Find("[data-testid='coverage-class-page-summary']").TextContent.Should().Contain("Showing 1-10 of 12");
+        cut.Markup.Should().Contain("Class01");
+        cut.Markup.Should().Contain("Class10");
+        cut.Markup.Should().NotContain("Class11");
+
+        await cut.Find("[data-testid='coverage-class-next-page']").ClickAsync(new MouseEventArgs());
+
+        cut.FindAll("[data-testid='coverage-class-row']").Should().HaveCount(2);
+        cut.Find("[data-testid='coverage-class-page-summary']").TextContent.Should().Contain("Showing 11-12 of 12");
+        cut.Markup.Should().Contain("Class11");
+        cut.Markup.Should().Contain("Class12");
+        cut.Markup.Should().NotContain("Class01");
     }
 
     [Fact]
@@ -150,6 +186,21 @@ internal static class CoverageAnalysisComponentTestData
             projects,
             classes);
     }
+
+    public static IReadOnlyList<CoverageClassCoverageDto> CreateClassCoverages(int count, string projectName = "CodePass.Web")
+        => Enumerable.Range(1, count)
+            .Select(index => new CoverageClassCoverageDto(
+                Guid.NewGuid(),
+                projectName,
+                $"Class{index:00}",
+                $"src/Services/Class{index:00}.cs",
+                8,
+                10,
+                80.0,
+                1,
+                2,
+                50.0))
+            .ToArray();
 
     public static CoverageAnalysisRunDto CreateFailedRun(Guid solutionId, string errorMessage)
         => new(
