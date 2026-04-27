@@ -10,6 +10,9 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
     public DbSet<SolutionRuleAssignment> SolutionRuleAssignments => Set<SolutionRuleAssignment>();
     public DbSet<RuleAnalysisRun> RuleAnalysisRuns => Set<RuleAnalysisRun>();
     public DbSet<RuleAnalysisViolation> RuleAnalysisViolations => Set<RuleAnalysisViolation>();
+    public DbSet<CoverageAnalysisRun> CoverageAnalysisRuns => Set<CoverageAnalysisRun>();
+    public DbSet<CoverageProjectSummary> CoverageProjectSummaries => Set<CoverageProjectSummary>();
+    public DbSet<CoverageClassCoverage> CoverageClassCoverages => Set<CoverageClassCoverage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,5 +93,65 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
             .OnDelete(DeleteBehavior.SetNull);
         ruleAnalysisViolation.HasIndex(violation => violation.RuleAnalysisRunId);
         ruleAnalysisViolation.HasIndex(violation => violation.RuleCode);
+
+        var coverageAnalysisRun = modelBuilder.Entity<CoverageAnalysisRun>();
+
+        coverageAnalysisRun.HasKey(run => run.Id);
+        coverageAnalysisRun.Property(run => run.Status).HasConversion<string>().IsRequired();
+        coverageAnalysisRun.Property(run => run.ProjectCount).IsRequired();
+        coverageAnalysisRun.Property(run => run.ClassCount).IsRequired();
+        coverageAnalysisRun.Property(run => run.CoveredLineCount).IsRequired();
+        coverageAnalysisRun.Property(run => run.TotalLineCount).IsRequired();
+        coverageAnalysisRun.Property(run => run.LineCoveragePercent).IsRequired();
+        coverageAnalysisRun.Property(run => run.CoveredBranchCount).IsRequired();
+        coverageAnalysisRun.Property(run => run.TotalBranchCount).IsRequired();
+        coverageAnalysisRun.Property(run => run.BranchCoveragePercent).IsRequired();
+        coverageAnalysisRun.Property(run => run.ErrorMessage);
+        coverageAnalysisRun.HasOne<RegisteredSolution>()
+            .WithMany()
+            .HasForeignKey(run => run.RegisteredSolutionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        coverageAnalysisRun.HasMany(run => run.ProjectSummaries)
+            .WithOne(summary => summary.CoverageAnalysisRun)
+            .HasForeignKey(summary => summary.CoverageAnalysisRunId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        coverageAnalysisRun.HasMany(run => run.ClassCoverages)
+            .WithOne(classCoverage => classCoverage.CoverageAnalysisRun)
+            .HasForeignKey(classCoverage => classCoverage.CoverageAnalysisRunId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+        coverageAnalysisRun.HasIndex(run => run.RegisteredSolutionId);
+        coverageAnalysisRun.HasIndex(run => run.StartedAtUtc);
+        coverageAnalysisRun.HasIndex(run => new { run.RegisteredSolutionId, run.StartedAtUtc });
+
+        var coverageProjectSummary = modelBuilder.Entity<CoverageProjectSummary>();
+
+        coverageProjectSummary.HasKey(summary => summary.Id);
+        coverageProjectSummary.Property(summary => summary.ProjectName).IsRequired();
+        coverageProjectSummary.Property(summary => summary.CoveredLineCount).IsRequired();
+        coverageProjectSummary.Property(summary => summary.TotalLineCount).IsRequired();
+        coverageProjectSummary.Property(summary => summary.LineCoveragePercent).IsRequired();
+        coverageProjectSummary.Property(summary => summary.CoveredBranchCount).IsRequired();
+        coverageProjectSummary.Property(summary => summary.TotalBranchCount).IsRequired();
+        coverageProjectSummary.Property(summary => summary.BranchCoveragePercent).IsRequired();
+        coverageProjectSummary.HasIndex(summary => summary.CoverageAnalysisRunId);
+        coverageProjectSummary.HasIndex(summary => summary.ProjectName);
+
+        var coverageClassCoverage = modelBuilder.Entity<CoverageClassCoverage>();
+
+        coverageClassCoverage.HasKey(classCoverage => classCoverage.Id);
+        coverageClassCoverage.Property(classCoverage => classCoverage.ProjectName).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.ClassName).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.FilePath).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.CoveredLineCount).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.TotalLineCount).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.LineCoveragePercent).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.CoveredBranchCount).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.TotalBranchCount).IsRequired();
+        coverageClassCoverage.Property(classCoverage => classCoverage.BranchCoveragePercent).IsRequired();
+        coverageClassCoverage.HasIndex(classCoverage => classCoverage.CoverageAnalysisRunId);
+        coverageClassCoverage.HasIndex(classCoverage => classCoverage.ClassName);
     }
 }
