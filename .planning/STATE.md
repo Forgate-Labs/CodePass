@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-coverage-analysis-review-02-PLAN.md
-last_updated: "2026-04-27T18:52:00.266Z"
-last_activity: 2026-04-27 — Completed Phase 4 coverage persistence schema with EF entities, additive SQLite initialization, and initializer regression tests.
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-04-27T19:00:45.629Z"
+last_activity: 2026-04-27 — Completed Phase 4 coverage result persistence service with normalized snapshots and SQLite-safe latest-run retrieval.
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 18
-  completed_plans: 14
-  percent: 78
+  completed_plans: 15
+  percent: 83
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 4 of 5 (Coverage Analysis Review)
-Plan: 03 of 6 (next: persist normalized coverage results and latest-run retrieval)
-Status: Phase 4 in progress; ready for Plan 04-03
-Last activity: 2026-04-27 — Completed Phase 4 coverage persistence schema with EF entities, additive SQLite initialization, and initializer regression tests.
+Plan: 04 of 6 (next: wire manual coverage run orchestration)
+Status: Phase 4 in progress; ready for Plan 04-04
+Last activity: 2026-04-27 — Completed Phase 4 coverage result persistence service with normalized snapshots and SQLite-safe latest-run retrieval.
 
-Progress: [████████░░] 78%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: 17.4 min
-- Total execution time: 4.1 hours
+- Total plans completed: 15
+- Average duration: 16.6 min
+- Total execution time: 4.2 hours
 
 **By Phase:**
 
@@ -46,11 +46,11 @@ Progress: [████████░░] 78%
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
 | 02-user-authored-rule-definitions | 3 | 125 min | 41.7 min |
 | 03-rule-analysis-review | 6 | 49 min | 8.2 min |
-| 04-coverage-analysis-review | 2 | 6 min | 3.0 min |
+| 04-coverage-analysis-review | 3 | 9 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-rule-analysis-review-04 (2 min), 03-rule-analysis-review-05 (3 min), 03-rule-analysis-review-06 (33 min), 04-coverage-analysis-review-01 (3 min), 04-coverage-analysis-review-02 (3 min)
-- Trend: Phase 4 started with focused backend coverage-analysis plans and fast automated verification.
+- Last 5 plans: 03-rule-analysis-review-05 (3 min), 03-rule-analysis-review-06 (33 min), 04-coverage-analysis-review-01 (3 min), 04-coverage-analysis-review-02 (3 min), 04-coverage-analysis-review-03 (3 min)
+- Trend: Phase 4 continues with focused backend coverage-analysis plans and fast automated verification.
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
@@ -65,6 +65,7 @@ Progress: [████████░░] 78%
 | Phase 03-rule-analysis-review P06 | 33 min | 2 tasks | 8 files |
 | Phase 04-coverage-analysis-review P01 | 3 min | 3 tasks | 5 files |
 | Phase 04-coverage-analysis-review P02 | 3 min | 3 tasks | 7 files |
+| Phase 04-coverage-analysis-review P03 | 3 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,9 @@ Recent decisions affecting current work:
 - [Phase 04-coverage-analysis-review]: Represent coverage engine outputs as immutable records that are not tied to EF persistence entities.
 - [Phase 04-coverage-analysis-review]: Use double-backed coverage percentages so SQLite stores coverage rates as REAL values and avoids decimal translation limitations. — SQLite-backed coverage data will be queried by later services, and REAL-backed percentages avoid provider limitations while preserving enough precision for UI reporting.
 - [Phase 04-coverage-analysis-review]: Add both separate and composite coverage-run lookup indexes so latest-run queries can filter by registered solution and order by start time efficiently. — Coverage result retrieval in later plans will need selected-solution latest-run lookups; the composite index supports that query shape while separate indexes satisfy direct lookup requirements.
+- [Phase 04-coverage-analysis-review]: Keep CoverageAnalysisResultService persistence-focused so coverage orchestration and dotnet test execution remain separate concerns for Plan 04-04. — Maintains separation between analyzer execution, run orchestration, and result persistence.
+- [Phase 04-coverage-analysis-review]: Materialize solution-filtered coverage runs before ordering by StartedAtUtc and Id so latest-run lookup remains SQLite-safe. — Avoids the known SQLite DateTimeOffset ordering translation issue while still filtering candidates in the database.
+- [Phase 04-coverage-analysis-review]: Expose immutable UI-facing coverage DTOs with ordered project summaries and class rows instead of returning EF entities. — Keeps UI and orchestrator callers decoupled from EF tracking and persistence schema details.
 
 ### Pending Todos
 
@@ -124,6 +128,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27T18:52:00.264Z
-Stopped at: Completed 04-coverage-analysis-review-02-PLAN.md
+Last session: 2026-04-27T19:00:45.627Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
