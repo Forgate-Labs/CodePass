@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 03-rule-analysis-review-06-PLAN.md
-last_updated: "2026-04-25T04:56:49.973Z"
-last_activity: 2026-04-25 — Completed Phase 3 rule-analysis review with human-approved `/analysis/rules` browser verification and final SQLite/runtime fixes.
+status: planning
+stopped_at: Completed 04-coverage-analysis-review-02-PLAN.md
+last_updated: "2026-04-27T18:52:00.266Z"
+last_activity: 2026-04-27 — Completed Phase 4 coverage persistence schema with EF entities, additive SQLite initialization, and initializer regression tests.
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_plans: 18
+  completed_plans: 14
+  percent: 78
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 ## Current Position
 
 Phase: 4 of 5 (Coverage Analysis Review)
-Plan: TBD (Phase 4 planning needed)
-Status: Phase 3 complete; ready for Phase 4 planning
-Last activity: 2026-04-25 — Completed Phase 3 rule-analysis review with human-approved `/analysis/rules` browser verification and final SQLite/runtime fixes.
+Plan: 03 of 6 (next: persist normalized coverage results and latest-run retrieval)
+Status: Phase 4 in progress; ready for Plan 04-03
+Last activity: 2026-04-27 — Completed Phase 4 coverage persistence schema with EF entities, additive SQLite initialization, and initializer regression tests.
 
-Progress: [██████████] 100%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 19.8 min
-- Total execution time: 4.0 hours
+- Total plans completed: 14
+- Average duration: 17.4 min
+- Total execution time: 4.1 hours
 
 **By Phase:**
 
@@ -46,10 +46,11 @@ Progress: [██████████] 100%
 | 01-registered-solutions | 3 | 61 min | 20.3 min |
 | 02-user-authored-rule-definitions | 3 | 125 min | 41.7 min |
 | 03-rule-analysis-review | 6 | 49 min | 8.2 min |
+| 04-coverage-analysis-review | 2 | 6 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-rule-analysis-review-02 (5 min), 03-rule-analysis-review-03 (3 min), 03-rule-analysis-review-04 (2 min), 03-rule-analysis-review-05 (3 min), 03-rule-analysis-review-06 (33 min)
-- Trend: Phase 3 completed with a longer final running-app verification checkpoint that produced targeted SQLite/runtime fixes.
+- Last 5 plans: 03-rule-analysis-review-04 (2 min), 03-rule-analysis-review-05 (3 min), 03-rule-analysis-review-06 (33 min), 04-coverage-analysis-review-01 (3 min), 04-coverage-analysis-review-02 (3 min)
+- Trend: Phase 4 started with focused backend coverage-analysis plans and fast automated verification.
 | Phase 01-registered-solutions P01 | 31 min | 3 tasks | 28 files |
 | Phase 01 P02 | 10 min | 3 tasks | 9 files |
 | Phase 01-registered-solutions P03 | 20 min | 3 tasks | 7 files |
@@ -62,6 +63,8 @@ Progress: [██████████] 100%
 | Phase 03-rule-analysis-review P04 | 2 min | 3 tasks | 4 files |
 | Phase 03-rule-analysis-review P05 | 3 min | 3 tasks | 7 files |
 | Phase 03-rule-analysis-review P06 | 33 min | 2 tasks | 8 files |
+| Phase 04-coverage-analysis-review P01 | 3 min | 3 tasks | 5 files |
+| Phase 04-coverage-analysis-review P02 | 3 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -105,6 +108,11 @@ Recent decisions affecting current work:
 - [Phase 03-rule-analysis-review]: Use Bootstrap-native cards, badges, switches, and alerts with stable `data-testid` selectors for maintainable Blazor component tests.
 - [Phase 03-rule-analysis-review]: Use the approved running-app browser workflow with a real user-authored raw JSON rule as the final Phase 3 acceptance signal.
 - [Phase 03-rule-analysis-review]: Keep final verification fixes narrow to rule-analysis SQLite translation, selected-solution display, and local Blazor static asset loading.
+- [Phase 04-coverage-analysis-review]: Keep coverage normalization isolated in CoberturaCoverageParser so persistence and UI work can consume normalized DTOs without shelling out to dotnet.
+- [Phase 04-coverage-analysis-review]: Keep DotNetCoverageAnalyzer responsible only for process execution, generated coverage-file discovery, readable failures, and temp-directory cleanup.
+- [Phase 04-coverage-analysis-review]: Represent coverage engine outputs as immutable records that are not tied to EF persistence entities.
+- [Phase 04-coverage-analysis-review]: Use double-backed coverage percentages so SQLite stores coverage rates as REAL values and avoids decimal translation limitations. — SQLite-backed coverage data will be queried by later services, and REAL-backed percentages avoid provider limitations while preserving enough precision for UI reporting.
+- [Phase 04-coverage-analysis-review]: Add both separate and composite coverage-run lookup indexes so latest-run queries can filter by registered solution and order by start time efficiently. — Coverage result retrieval in later plans will need selected-solution latest-run lookups; the composite index supports that query shape while separate indexes satisfy direct lookup requirements.
 
 ### Pending Todos
 
@@ -116,6 +124,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-25T04:56:49.971Z
-Stopped at: Completed 03-rule-analysis-review-06-PLAN.md
+Last session: 2026-04-27T18:52:00.264Z
+Stopped at: Completed 04-coverage-analysis-review-02-PLAN.md
 Resume file: None

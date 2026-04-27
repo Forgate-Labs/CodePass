@@ -73,7 +73,14 @@ Plans:
   2. After the run completes, user can view normalized coverage results in the UI for the current analyzed solution.
   3. User can inspect unit test coverage for each class in the analyzed solution.
   4. User can inspect a project-level coverage summary for the current analyzed solution.
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [x] 04-01-PLAN.md — Build the TDD coverage engine, Cobertura normalization, and dotnet test runner.
+- [x] 04-02-PLAN.md — Add coverage run, project summary, and class coverage persistence schema.
+- [ ] 04-03-PLAN.md — Persist normalized coverage results and expose latest-run DTO retrieval.
+- [ ] 04-04-PLAN.md — Wire manual coverage run orchestration from registered solutions to persisted results.
+- [ ] 04-05-PLAN.md — Build the `/analysis/coverage` UI for manual runs, project summaries, and class rows.
+- [ ] 04-06-PLAN.md — Verify the completed coverage-analysis workflow in the running app.
 
 ### Phase 5: Quality Score Dashboard
 **Goal**: Users can understand whether the current analysis snapshot passes and how rule and coverage evidence drive the score.
@@ -118,5 +125,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Registered Solutions | 3/3 | Complete | 2026-04-19 |
 | 2. User-Authored Rule Definitions | 3/3 | Complete | 2026-04-25 |
 | 3. Rule Analysis Review | 6/6 | Complete | 2026-04-25 |
-| 4. Coverage Analysis Review | 0/TBD | Not started | - |
+| 4. Coverage Analysis Review | 2/6 | In Progress | - |
 | 5. Quality Score Dashboard | 0/TBD | Not started | - |

@@ -21,10 +21,10 @@
 
 ### Coverage
 
-- [ ] **COV-01**: User can manually start a coverage-analysis run for a registered solution.
-- [ ] **COV-02**: User can view unit test coverage for each class in the analyzed solution.
-- [ ] **COV-03**: User can view a project-level coverage summary for the current analyzed solution.
-- [ ] **COV-04**: User can view normalized coverage results in the UI after a coverage run completes.
+- [x] **COV-01**: User can manually start a coverage-analysis run for a registered solution.
+- [x] **COV-02**: User can view unit test coverage for each class in the analyzed solution.
+- [x] **COV-03**: User can view a project-level coverage summary for the current analyzed solution.
+- [x] **COV-04**: User can view normalized coverage results in the UI after a coverage run completes.
 
 ### Dashboard
 
@@ -63,10 +63,10 @@
 | RULE-04 | Phase 3 - Rule Analysis Review | Complete |
 | RULE-05 | Phase 3 - Rule Analysis Review | Complete |
 | RULE-06 | Phase 3 - Rule Analysis Review | Complete |
-| COV-01 | Phase 4 - Coverage Analysis Review | Pending |
-| COV-02 | Phase 4 - Coverage Analysis Review | Pending |
-| COV-03 | Phase 4 - Coverage Analysis Review | Pending |
-| COV-04 | Phase 4 - Coverage Analysis Review | Pending |
+| COV-01 | Phase 4 - Coverage Analysis Review | Complete |
+| COV-02 | Phase 4 - Coverage Analysis Review | Complete |
+| COV-03 | Phase 4 - Coverage Analysis Review | Complete |
+| COV-04 | Phase 4 - Coverage Analysis Review | Complete |
 | DASH-01 | Phase 5 - Quality Score Dashboard | Pending |
 | DASH-02 | Phase 5 - Quality Score Dashboard | Pending |
 | DASH-03 | Phase 5 - Quality Score Dashboard | Pending |
