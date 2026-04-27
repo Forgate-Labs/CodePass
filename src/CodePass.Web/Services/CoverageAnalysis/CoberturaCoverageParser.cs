@@ -6,6 +6,8 @@ namespace CodePass.Web.Services.CoverageAnalysis;
 
 public sealed partial class CoberturaCoverageParser
 {
+    private static readonly StringComparer CoverageSortComparer = StringComparer.Ordinal;
+
     public CoverageAnalysisResult Parse(params string[] coberturaFilePaths)
     {
         ArgumentNullException.ThrowIfNull(coberturaFilePaths);
@@ -47,9 +49,9 @@ public sealed partial class CoberturaCoverageParser
         }
 
         var classes = classTotals
-            .OrderBy(row => row.Key.ProjectName, StringComparer.Ordinal)
-            .ThenBy(row => row.Key.ClassName, StringComparer.Ordinal)
-            .ThenBy(row => row.Key.FilePath, StringComparer.Ordinal)
+            .OrderBy(row => row.Key.ProjectName, CoverageSortComparer)
+            .ThenBy(row => row.Key.ClassName, CoverageSortComparer)
+            .ThenBy(row => row.Key.FilePath, CoverageSortComparer)
             .Select(row => new CoverageClassCoverage(
                 row.Key.ProjectName,
                 row.Key.ClassName,
@@ -63,8 +65,8 @@ public sealed partial class CoberturaCoverageParser
             .ToArray();
 
         var projects = classes
-            .GroupBy(row => row.ProjectName, StringComparer.Ordinal)
-            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .GroupBy(row => row.ProjectName, CoverageSortComparer)
+            .OrderBy(group => group.Key, CoverageSortComparer)
             .Select(group =>
             {
                 var coveredLines = group.Sum(row => row.CoveredLines);

@@ -144,6 +144,96 @@ public sealed class CoberturaCoverageParserTests
                 BranchCoveragePercent: 75));
     }
 
+    [Fact]
+    public async Task Parse_ShouldReturnEmptyResultWhenPackagesAreMissing()
+    {
+        using var fixture = new CoberturaXmlFixture();
+        var coveragePath = await fixture.WriteAsync(
+            "empty.coverage.cobertura.xml",
+            """
+            <coverage>
+              <sources />
+            </coverage>
+            """);
+
+        var result = new CoberturaCoverageParser().Parse(coveragePath);
+
+        result.Projects.Should().BeEmpty();
+        result.Classes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Parse_ShouldHandleMissingFilenameAndBranchDataWithoutThrowing()
+    {
+        using var fixture = new CoberturaXmlFixture();
+        var coveragePath = await fixture.WriteAsync(
+            "partial.coverage.cobertura.xml",
+            """
+            <coverage>
+              <packages>
+                <package name="Partial.Project">
+                  <classes>
+                    <class name="Partial.Project.Target">
+                      <lines>
+                        <line number="10" hits="1" />
+                        <line number="11" hits="0" />
+                      </lines>
+                    </class>
+                  </classes>
+                </package>
+              </packages>
+            </coverage>
+            """);
+
+        var result = new CoberturaCoverageParser().Parse(coveragePath);
+
+        result.Classes.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new CoverageClassCoverage(
+                ProjectName: "Partial.Project",
+                ClassName: "Partial.Project.Target",
+                FilePath: string.Empty,
+                CoveredLines: 1,
+                TotalLines: 2,
+                LineCoveragePercent: 50,
+                CoveredBranches: 0,
+                TotalBranches: 0,
+                BranchCoveragePercent: 0));
+        result.Projects.Should().ContainSingle().Which.BranchCoveragePercent.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Parse_ShouldReturnStableOrderingByProjectClassAndFilePath()
+    {
+        using var fixture = new CoberturaXmlFixture();
+        var coveragePath = await fixture.WriteAsync(
+            "unordered.coverage.cobertura.xml",
+            """
+            <coverage>
+              <packages>
+                <package name="Beta.Project">
+                  <classes>
+                    <class name="Beta.Project.Zeta" filename="Zeta.cs"><lines><line number="1" hits="1" /></lines></class>
+                    <class name="Beta.Project.Alpha" filename="Alpha.cs"><lines><line number="1" hits="1" /></lines></class>
+                  </classes>
+                </package>
+                <package name="Alpha.Project">
+                  <classes>
+                    <class name="Alpha.Project.Target" filename="Target.cs"><lines><line number="1" hits="1" /></lines></class>
+                  </classes>
+                </package>
+              </packages>
+            </coverage>
+            """);
+
+        var result = new CoberturaCoverageParser().Parse(coveragePath);
+
+        result.Projects.Select(project => project.ProjectName).Should().Equal("Alpha.Project", "Beta.Project");
+        result.Classes.Select(row => $"{row.ProjectName}|{row.ClassName}|{row.FilePath}").Should().Equal(
+            "Alpha.Project|Alpha.Project.Target|Target.cs",
+            "Beta.Project|Beta.Project.Alpha|Alpha.cs",
+            "Beta.Project|Beta.Project.Zeta|Zeta.cs");
+    }
+
     private sealed class CoberturaXmlFixture : IDisposable
     {
         private readonly string _rootPath = Path.Combine(Path.GetTempPath(), "codepass-cobertura-parser-tests", Guid.NewGuid().ToString("N"));
