@@ -1,5 +1,6 @@
 using CodePass.Web.Components;
 using CodePass.Web.Data;
+using CodePass.Web.Services.CoverageAnalysis;
 using CodePass.Web.Services.RuleAnalysis;
 using CodePass.Web.Services.Rules;
 using CodePass.Web.Services.Solutions;
@@ -22,6 +23,7 @@ builder.Services.AddScoped<ISolutionRuleSelectionService, SolutionRuleSelectionS
 builder.Services.AddScoped<IRuleAnalyzer, RoslynRuleAnalyzer>();
 builder.Services.AddScoped<IRuleAnalysisResultService, RuleAnalysisResultService>();
 builder.Services.AddScoped<IRuleAnalysisRunService, RuleAnalysisRunService>();
+builder.Services.AddScoped<ICoverageAnalysisResultService, CoverageAnalysisResultService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
