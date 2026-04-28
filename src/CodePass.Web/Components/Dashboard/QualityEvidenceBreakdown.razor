@@ -1,0 +1,154 @@
+@using CodePass.Web.Services.Dashboard
+
+<section aria-labelledby="quality-evidence-breakdown-heading" data-testid="quality-evidence-breakdown">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3 mb-3">
+        <div>
+            <h2 class="h4 mb-1" id="quality-evidence-breakdown-heading">Evidence breakdown</h2>
+            <p class="text-body-secondary mb-0">See how rule-analysis and coverage-analysis evidence contribute to the current score.</p>
+        </div>
+    </div>
+
+    @if (Snapshot is null)
+    {
+        <div class="border rounded-3 p-3 text-body-secondary" data-testid="quality-evidence-empty-state">
+            Run rule analysis and coverage analysis to explain the current quality score.
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-lg-2 g-3">
+            <div class="col">
+                <article class="card h-100 shadow-sm border-0" aria-labelledby="rule-contribution-heading" data-testid="rule-contribution-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                            <div>
+                                <p class="text-body-secondary text-uppercase small fw-semibold mb-1">Rule evidence</p>
+                                <h3 class="h5 mb-0" id="rule-contribution-heading">Rule analysis contribution</h3>
+                            </div>
+                            <span class="badge @GetEvidenceStatusBadgeClass(Snapshot.RuleContribution.EvidenceStatus)" data-testid="rule-evidence-status">@Snapshot.RuleContribution.EvidenceStatus</span>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex align-items-baseline gap-2 mb-2">
+                                <span class="h2 mb-0" data-testid="rule-contribution-points">@FormatPoints(Snapshot.RuleContribution.EarnedPoints)/@FormatPoints(Snapshot.RuleContribution.MaxPoints)</span>
+                                <span class="text-body-secondary">points</span>
+                            </div>
+                            <div class="progress" role="progressbar" aria-label="Rule contribution progress" aria-valuenow="@GetContributionPercent(Snapshot.RuleContribution.EarnedPoints, Snapshot.RuleContribution.MaxPoints)" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width: @GetContributionPercent(Snapshot.RuleContribution.EarnedPoints, Snapshot.RuleContribution.MaxPoints)%"></div>
+                            </div>
+                        </div>
+
+                        <dl class="row small mb-3">
+                            <dt class="col-7 text-body-secondary">Total violations</dt>
+                            <dd class="col-5 text-end mb-2" data-testid="rule-total-violations">@Snapshot.RuleContribution.TotalViolations</dd>
+
+                            <dt class="col-7 text-body-secondary">Errors</dt>
+                            <dd class="col-5 text-end mb-2" data-testid="rule-error-count">@Snapshot.RuleContribution.ErrorCount</dd>
+
+                            <dt class="col-7 text-body-secondary">Warnings</dt>
+                            <dd class="col-5 text-end mb-2" data-testid="rule-warning-count">@Snapshot.RuleContribution.WarningCount</dd>
+
+                            <dt class="col-7 text-body-secondary">Info</dt>
+                            <dd class="col-5 text-end mb-2" data-testid="rule-info-count">@Snapshot.RuleContribution.InfoCount</dd>
+
+                            <dt class="col-7 text-body-secondary">Latest rule run</dt>
+                            <dd class="col-5 text-end mb-0" data-testid="rule-latest-status">@Snapshot.RuleContribution.EvidenceStatus</dd>
+                        </dl>
+
+                        <p class="mb-3" data-testid="rule-contribution-summary">@Snapshot.RuleContribution.Summary</p>
+
+                        @if (Snapshot.RuleContribution.BlockingReasons.Count > 0)
+                        {
+                            <ul class="small text-body-secondary ps-3 mb-3" data-testid="rule-contribution-reasons">
+                                @foreach (var reason in Snapshot.RuleContribution.BlockingReasons)
+                                {
+                                    <li>@reason</li>
+                                }
+                            </ul>
+                        }
+
+                        <a class="btn btn-outline-primary btn-sm" href="/analysis/rules">Open rule analysis</a>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col">
+                <article class="card h-100 shadow-sm border-0" aria-labelledby="coverage-contribution-heading" data-testid="coverage-contribution-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                            <div>
+                                <p class="text-body-secondary text-uppercase small fw-semibold mb-1">Coverage evidence</p>
+                                <h3 class="h5 mb-0" id="coverage-contribution-heading">Coverage contribution</h3>
+                            </div>
+                            <span class="badge @GetEvidenceStatusBadgeClass(Snapshot.CoverageContribution.EvidenceStatus)" data-testid="coverage-evidence-status">@Snapshot.CoverageContribution.EvidenceStatus</span>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex align-items-baseline gap-2 mb-2">
+                                <span class="h2 mb-0" data-testid="coverage-contribution-points">@FormatPoints(Snapshot.CoverageContribution.EarnedPoints)/@FormatPoints(Snapshot.CoverageContribution.MaxPoints)</span>
+                                <span class="text-body-secondary">points</span>
+                            </div>
+                            <div class="progress" role="progressbar" aria-label="Coverage contribution progress" aria-valuenow="@GetContributionPercent(Snapshot.CoverageContribution.EarnedPoints, Snapshot.CoverageContribution.MaxPoints)" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width: @GetContributionPercent(Snapshot.CoverageContribution.EarnedPoints, Snapshot.CoverageContribution.MaxPoints)%"></div>
+                            </div>
+                        </div>
+
+                        <dl class="row small mb-3">
+                            <dt class="col-7 text-body-secondary">Line coverage</dt>
+                            <dd class="col-5 text-end mb-2" data-testid="coverage-line-percent">@FormatOptionalPercent(Snapshot.CoverageContribution.LineCoveragePercent)</dd>
+
+                            <dt class="col-7 text-body-secondary">Covered lines</dt>
+                            <dd class="col-5 text-end mb-2" data-testid="coverage-line-counts">@FormatLineCounts(Snapshot.CoverageContribution)</dd>
+
+                            <dt class="col-7 text-body-secondary">Latest coverage run</dt>
+                            <dd class="col-5 text-end mb-0" data-testid="coverage-latest-status">@Snapshot.CoverageContribution.EvidenceStatus</dd>
+                        </dl>
+
+                        <p class="mb-3" data-testid="coverage-contribution-summary">@Snapshot.CoverageContribution.Summary</p>
+
+                        @if (Snapshot.CoverageContribution.BlockingReasons.Count > 0)
+                        {
+                            <ul class="small text-body-secondary ps-3 mb-3" data-testid="coverage-contribution-reasons">
+                                @foreach (var reason in Snapshot.CoverageContribution.BlockingReasons)
+                                {
+                                    <li>@reason</li>
+                                }
+                            </ul>
+                        }
+
+                        <a class="btn btn-outline-primary btn-sm" href="/analysis/coverage">Open coverage analysis</a>
+                    </div>
+                </article>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public QualityScoreSnapshotDto? Snapshot { get; set; }
+
+    private static string FormatPoints(double value)
+        => value.ToString("0.#");
+
+    private static string FormatOptionalPercent(double? value)
+        => value.HasValue ? $"{value.Value:0.0}%" : "Not available";
+
+    private static string FormatLineCounts(QualityCoverageContributionDto contribution)
+        => contribution.CoveredLineCount.HasValue && contribution.TotalLineCount.HasValue
+            ? $"{contribution.CoveredLineCount}/{contribution.TotalLineCount}"
+            : "Not available";
+
+    private static double GetContributionPercent(double earnedPoints, double maxPoints)
+        => maxPoints <= 0 ? 0 : Math.Clamp(Math.Round(earnedPoints / maxPoints * 100, 1), 0, 100);
+
+    private static string GetEvidenceStatusBadgeClass(QualityEvidenceStatus status)
+        => status switch
+        {
+            QualityEvidenceStatus.Succeeded => "text-bg-success",
+            QualityEvidenceStatus.Failed => "text-bg-danger",
+            QualityEvidenceStatus.Running => "text-bg-warning",
+            QualityEvidenceStatus.Missing => "text-bg-secondary",
+            _ => "text-bg-secondary"
+        };
+}
