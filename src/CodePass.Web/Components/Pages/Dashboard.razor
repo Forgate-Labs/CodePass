@@ -1,0 +1,218 @@
+@page "/dashboard"
+@using CodePass.Web.Components.Dashboard
+@using CodePass.Web.Data.Entities
+@using CodePass.Web.Services.Dashboard
+@using CodePass.Web.Services.Solutions
+@inject IRegisteredSolutionService RegisteredSolutionService
+@inject IQualityScoreService QualityScoreService
+
+<PageTitle>Quality Dashboard</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">Quality Dashboard</h1>
+            <p class="text-body-secondary mb-0">Choose a registered solution and review the latest quality score from rule and coverage evidence.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(LoadError))
+    {
+        <div class="alert alert-danger" role="alert" data-testid="dashboard-load-error">@LoadError</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ScoreLoadError))
+    {
+        <div class="alert alert-danger" role="alert" data-testid="dashboard-score-load-error">@ScoreLoadError</div>
+    }
+
+    @if (IsLoadingSolutions)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p class="mb-0 text-body-secondary">Loading registered solutions...</p>
+            </div>
+        </div>
+    }
+    else if (Solutions.Count == 0)
+    {
+        <div class="card shadow-sm border-0" data-testid="dashboard-empty-state">
+            <div class="card-body p-4 text-center">
+                <h2 class="h4 mb-2">No registered solutions yet</h2>
+                <p class="text-body-secondary mb-0">Register a local <code>.sln</code> file before reviewing a quality score.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <section class="mb-4" aria-labelledby="dashboard-solution-selection-heading">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                <div>
+                    <h2 class="h4 mb-1" id="dashboard-solution-selection-heading">Select a solution</h2>
+                    <p class="text-body-secondary mb-0">CodePass defaults to the first valid registered solution when one is available.</p>
+                </div>
+            </div>
+
+            <div class="row g-3" data-testid="dashboard-solution-list">
+                @foreach (var solution in Solutions)
+                {
+                    var isSelected = SelectedSolution?.Id == solution.Id;
+                    <div class="col-12 col-xl-6" data-testid="dashboard-solution-card">
+                        <button class="card h-100 w-100 text-start shadow-sm @(isSelected ? "border-primary" : "border-0")"
+                                type="button"
+                                @onclick="() => SelectSolutionAsync(solution.Id)"
+                                aria-pressed="@isSelected.ToString().ToLowerInvariant()"
+                                data-testid="select-dashboard-solution-button">
+                            <div class="card-body">
+                                <div class="d-flex align-items-start justify-content-between gap-3 mb-2">
+                                    <div>
+                                        <h3 class="h5 mb-1" data-testid="dashboard-solution-name">@solution.DisplayName</h3>
+                                        <p class="text-body-secondary small mb-0" data-testid="dashboard-solution-path">@solution.SolutionPath</p>
+                                    </div>
+                                    <span class="badge @GetSolutionStatusBadgeClass(solution.Status)" data-testid="dashboard-solution-status">@FormatStatus(solution.Status)</span>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(solution.StatusMessage))
+                                {
+                                    <p class="small text-body-secondary mb-0">@solution.StatusMessage</p>
+                                }
+                            </div>
+                        </button>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @if (SelectedSolution is null)
+        {
+            <div class="alert alert-warning" role="alert" data-testid="dashboard-no-valid-solution-message">
+                No valid registered solution is available yet. Select a registered solution above to inspect any available quality evidence.
+            </div>
+        }
+        else
+        {
+            @if (SelectedSolution.Status != RegisteredSolutionStatus.Valid)
+            {
+                <div class="alert alert-warning" role="alert" data-testid="dashboard-invalid-solution-message">
+                    The selected solution is currently @FormatStatus(SelectedSolution.Status). Existing evidence can still be reviewed, but new analysis runs require a valid solution.
+                </div>
+            }
+
+            @if (IsLoadingScore)
+            {
+                <div class="card shadow-sm border-0" data-testid="dashboard-score-loading">
+                    <div class="card-body">
+                        <p class="mb-0 text-body-secondary">Loading current quality score...</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="row g-4">
+                    <div class="col-12 col-xxl-4">
+                        <QualityScoreSummary Snapshot="CurrentSnapshot" SolutionName="@SelectedSolution.DisplayName" />
+                    </div>
+                    <div class="col-12 col-xxl-8">
+                        <QualityEvidenceBreakdown Snapshot="CurrentSnapshot" />
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private bool IsLoadingSolutions { get; set; } = true;
+    private bool IsLoadingScore { get; set; }
+    private string? LoadError { get; set; }
+    private string? ScoreLoadError { get; set; }
+    private RegisteredSolution? SelectedSolution { get; set; }
+    private QualityScoreSnapshotDto? CurrentSnapshot { get; set; }
+    private IReadOnlyList<RegisteredSolution> Solutions { get; set; } = Array.Empty<RegisteredSolution>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSolutionsAsync();
+    }
+
+    private async Task LoadSolutionsAsync()
+    {
+        try
+        {
+            IsLoadingSolutions = true;
+            LoadError = null;
+            ScoreLoadError = null;
+            Solutions = await RegisteredSolutionService.GetAllAsync();
+            SelectedSolution = Solutions.FirstOrDefault(solution => solution.Status == RegisteredSolutionStatus.Valid);
+        }
+        catch (Exception ex)
+        {
+            LoadError = $"Unable to load registered solutions: {ex.Message}";
+            Solutions = Array.Empty<RegisteredSolution>();
+            SelectedSolution = null;
+            CurrentSnapshot = null;
+        }
+        finally
+        {
+            IsLoadingSolutions = false;
+        }
+
+        if (SelectedSolution is not null)
+        {
+            await LoadCurrentSnapshotAsync(SelectedSolution.Id);
+        }
+    }
+
+    private async Task SelectSolutionAsync(Guid solutionId)
+    {
+        SelectedSolution = Solutions.SingleOrDefault(solution => solution.Id == solutionId);
+        ScoreLoadError = null;
+        CurrentSnapshot = null;
+
+        if (SelectedSolution is null)
+        {
+            return;
+        }
+
+        await LoadCurrentSnapshotAsync(SelectedSolution.Id);
+    }
+
+    private async Task LoadCurrentSnapshotAsync(Guid solutionId)
+    {
+        try
+        {
+            IsLoadingScore = true;
+            ScoreLoadError = null;
+            CurrentSnapshot = await QualityScoreService.GetCurrentSnapshotAsync(solutionId);
+        }
+        catch (Exception ex)
+        {
+            CurrentSnapshot = null;
+            ScoreLoadError = $"Unable to load current quality score: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingScore = false;
+        }
+    }
+
+    private static string FormatStatus(RegisteredSolutionStatus status)
+        => status switch
+        {
+            RegisteredSolutionStatus.Valid => "Valid",
+            RegisteredSolutionStatus.FileNotFound => "File not found",
+            RegisteredSolutionStatus.PathInaccessible => "Path inaccessible",
+            RegisteredSolutionStatus.Invalid => "Invalid",
+            _ => status.ToString()
+        };
+
+    private static string GetSolutionStatusBadgeClass(RegisteredSolutionStatus status)
+        => status switch
+        {
+            RegisteredSolutionStatus.Valid => "text-bg-success",
+            RegisteredSolutionStatus.FileNotFound => "text-bg-warning",
+            RegisteredSolutionStatus.PathInaccessible => "text-bg-danger",
+            RegisteredSolutionStatus.Invalid => "text-bg-secondary",
+            _ => "text-bg-secondary"
+        };
+}
