@@ -94,7 +94,7 @@ Plans:
 Plans:
 - [x] 05-01-PLAN.md — Build the TDD current-snapshot scoring service from latest rule and coverage evidence.
 - [x] 05-02-PLAN.md — Create reusable dashboard score summary and evidence breakdown components.
-- [ ] 05-03-PLAN.md — Build the `/dashboard` page and sidebar navigation workflow.
+- [x] 05-03-PLAN.md — Build the `/dashboard` page and sidebar navigation workflow.
 - [ ] 05-04-PLAN.md — Verify the completed quality dashboard with automated and running-app checks.
 
 ## Requirement Coverage
@@ -131,4 +131,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. User-Authored Rule Definitions | 3/3 | Complete | 2026-04-25 |
 | 3. Rule Analysis Review | 6/6 | Complete | 2026-04-25 |
 | 4. Coverage Analysis Review | 6/6 | Complete | 2026-04-28 |
-| 5. Quality Score Dashboard | 2/4 | In Progress | - |
+| 5. Quality Score Dashboard | 3/4 | In Progress | - |
