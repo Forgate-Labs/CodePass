@@ -107,6 +107,44 @@ public sealed class RuleAnalysisPageTests : TestContext
     }
 
     [Fact]
+    public async Task RunRuleAnalysis_ShouldRenderProgressWhileRunIsActive()
+    {
+        var solution = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var runService = new RuleAnalysisTestRunService
+        {
+            PendingRun = new TaskCompletionSource<RuleAnalysisRunDto>(TaskCreationOptions.RunContinuationsAsynchronously)
+        };
+
+        Services.AddSingleton<IRegisteredSolutionService>(new RuleAnalysisTestRegisteredSolutionService(solution));
+        Services.AddSingleton<ISolutionRuleSelectionService>(new RuleAnalysisTestSelectionService());
+        Services.AddSingleton<IRuleAnalysisRunService>(runService);
+        Services.AddSingleton<IRuleAnalysisResultService>(new RuleAnalysisTestResultService());
+
+        var cut = RenderComponent<RuleAnalysis>();
+        cut.WaitForAssertion(() => cut.Find("[data-testid='run-rule-analysis-button']").TextContent.Should().Contain("Run rule analysis"));
+
+        var clickTask = cut.Find("[data-testid='run-rule-analysis-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='rule-analysis-progress']");
+            cut.Find("[data-testid='rule-analysis-progress-stage']").TextContent.Should().Contain("Analyzing projects");
+            cut.Find("[data-testid='rule-analysis-progress-message']").TextContent.Should().Contain("Analyzing source documents");
+            cut.Find("[data-testid='rule-analysis-progress-detail']").TextContent.Should().Contain("src/App/Program.cs");
+            cut.Find("[data-testid='rule-analysis-progress-count']").TextContent.Should().Contain("1 / 2");
+            cut.Find("[data-testid='rule-analysis-progress-bar']").GetAttribute("aria-valuenow").Should().Be("50");
+        });
+
+        runService.PendingRun.SetResult(RuleAnalysisComponentTestData.CreateSucceededRun(solution.Id));
+        await clickTask;
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='run-rule-analysis-button']").TextContent.Should().Contain("Run rule analysis");
+        });
+    }
+
+    [Fact]
     public async Task SwitchingSolutions_ShouldReloadLatestResultsForSelectedSolution()
     {
         var alpha = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
@@ -278,10 +316,27 @@ internal sealed class RuleAnalysisTestRunService : IRuleAnalysisRunService
 {
     public Dictionary<Guid, RuleAnalysisRunDto> RunsBySolution { get; } = [];
     public List<Guid> StartCalls { get; } = [];
+    public TaskCompletionSource<RuleAnalysisRunDto>? PendingRun { get; set; }
 
-    public Task<RuleAnalysisRunDto> StartRunAsync(Guid registeredSolutionId, CancellationToken cancellationToken = default)
+    public Task<RuleAnalysisRunDto> StartRunAsync(
+        Guid registeredSolutionId,
+        CancellationToken cancellationToken = default,
+        IProgress<RuleAnalysisProgressDto>? progress = null)
     {
         StartCalls.Add(registeredSolutionId);
+        progress?.Report(new RuleAnalysisProgressDto(
+            RuleAnalysisProgressStage.AnalyzingProjects,
+            "Analyzing source documents...",
+            PercentComplete: 50,
+            Current: 1,
+            Total: 2,
+            Detail: "src/App/Program.cs"));
+
+        if (PendingRun is not null)
+        {
+            return PendingRun.Task;
+        }
+
         return Task.FromResult(RunsBySolution.GetValueOrDefault(registeredSolutionId, RuleAnalysisComponentTestData.CreateSucceededRun(registeredSolutionId)));
     }
 }

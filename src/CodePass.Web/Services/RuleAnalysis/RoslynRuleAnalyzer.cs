@@ -22,16 +22,19 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
     public async Task<IReadOnlyList<RuleAnalysisFinding>> AnalyzeAsync(
         string solutionPath,
         IReadOnlyList<AuthoredRuleDefinitionDto> rules,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<RuleAnalysisProgressDto>? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
         ArgumentNullException.ThrowIfNull(rules);
 
         if (rules.Count == 0)
         {
+            Report(progress, RuleAnalysisProgressStage.Completed, "No enabled rules to analyze.", percentComplete: 100);
             return [];
         }
 
+        Report(progress, RuleAnalysisProgressStage.LoadingSolution, "Registering MSBuild defaults...", percentComplete: 22);
         RegisterMSBuildDefaults();
 
         var solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(solutionPath)) ?? Directory.GetCurrentDirectory();
@@ -41,12 +44,37 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
             ["BuildProjectReferences"] = "false"
         });
 
+        Report(progress, RuleAnalysisProgressStage.LoadingSolution, "Opening solution with Roslyn/MSBuild...", percentComplete: 25, detail: solutionPath);
         var solution = await workspace.OpenSolutionAsync(solutionPath, cancellationToken: cancellationToken);
         var findings = new List<RuleAnalysisFinding>();
+        var projects = solution.Projects.ToArray();
+        var totalDocuments = projects
+            .SelectMany(project => project.Documents)
+            .Count(document => document.SourceCodeKind == SourceCodeKind.Regular
+                && !string.IsNullOrWhiteSpace(document.FilePath)
+                && document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase));
+        var processedDocuments = 0;
 
-        foreach (var project in solution.Projects)
+        Report(
+            progress,
+            RuleAnalysisProgressStage.AnalyzingProjects,
+            $"Analyzing {projects.Length} project(s) and {totalDocuments} C# document(s)...",
+            percentComplete: 30,
+            current: 0,
+            total: totalDocuments);
+
+        foreach (var project in projects)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            Report(
+                progress,
+                RuleAnalysisProgressStage.AnalyzingProjects,
+                $"Analyzing project {project.Name}...",
+                percentComplete: CalculateAnalysisPercent(processedDocuments, totalDocuments),
+                current: processedDocuments,
+                total: totalDocuments,
+                detail: project.FilePath ?? project.Name);
 
             foreach (var document in project.Documents.Where(document => document.SourceCodeKind == SourceCodeKind.Regular))
             {
@@ -59,6 +87,16 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
                 }
 
                 var relativePath = GetRelativePath(solutionDirectory, filePath);
+                processedDocuments++;
+                Report(
+                    progress,
+                    RuleAnalysisProgressStage.AnalyzingProjects,
+                    $"Analyzing document {processedDocuments} of {totalDocuments}...",
+                    percentComplete: CalculateAnalysisPercent(processedDocuments, totalDocuments),
+                    current: processedDocuments,
+                    total: totalDocuments,
+                    detail: relativePath);
+
                 var applicableRules = rules
                     .Where(rule => IsRuleInScope(rule, relativePath))
                     .ToArray();
@@ -106,8 +144,35 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
             }
         }
 
+        Report(progress, RuleAnalysisProgressStage.AnalyzingProjects, "Finished analyzing source documents.", percentComplete: 90, current: processedDocuments, total: totalDocuments);
         return findings;
     }
+
+    private static int CalculateAnalysisPercent(int processedDocuments, int totalDocuments)
+    {
+        if (totalDocuments <= 0)
+        {
+            return 90;
+        }
+
+        return Math.Clamp(30 + (int)Math.Round(processedDocuments * 60d / totalDocuments), 30, 90);
+    }
+
+    private static void Report(
+        IProgress<RuleAnalysisProgressDto>? progress,
+        RuleAnalysisProgressStage stage,
+        string message,
+        int? percentComplete = null,
+        int? current = null,
+        int? total = null,
+        string? detail = null)
+        => progress?.Report(new RuleAnalysisProgressDto(
+            stage,
+            message,
+            percentComplete,
+            current,
+            total,
+            detail));
 
     private static IReadOnlyList<RuleAnalysisFinding> AnalyzeSyntaxPresence(
         AuthoredRuleDefinitionDto rule,

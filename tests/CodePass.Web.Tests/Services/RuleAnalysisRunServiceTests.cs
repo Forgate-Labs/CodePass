@@ -326,7 +326,8 @@ internal sealed class FakeRuleAnalyzer : IRuleAnalyzer
     public Task<IReadOnlyList<RuleAnalysisFinding>> AnalyzeAsync(
         string solutionPath,
         IReadOnlyList<AuthoredRuleDefinitionDto> rules,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<RuleAnalysisProgressDto>? progress = null)
     {
         Calls.Add(new AnalyzeCall(solutionPath, rules.ToList()));
 

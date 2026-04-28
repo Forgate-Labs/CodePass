@@ -7,5 +7,6 @@ public interface IRuleAnalyzer
     Task<IReadOnlyList<RuleAnalysisFinding>> AnalyzeAsync(
         string solutionPath,
         IReadOnlyList<AuthoredRuleDefinitionDto> rules,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<RuleAnalysisProgressDto>? progress = null);
 }
