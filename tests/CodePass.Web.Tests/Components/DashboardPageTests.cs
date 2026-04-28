@@ -1,4 +1,5 @@
 using Bunit;
+using CodePass.Web.Components.Layout;
 using CodePass.Web.Components.Pages;
 using CodePass.Web.Data.Entities;
 using CodePass.Web.Services.Dashboard;
@@ -147,6 +148,21 @@ public sealed class DashboardPageTests : TestContext
             cut.Find("[data-testid='quality-score-empty-state']").TextContent.Should().Contain("No current quality score");
             cut.Find("[data-testid='quality-evidence-empty-state']").TextContent.Should().Contain("Run rule analysis and coverage analysis");
         });
+    }
+
+    [Fact]
+    public void NavMenu_ShouldExposeDashboardAndPreserveExistingReviewLinks()
+    {
+        var cut = RenderComponent<NavMenu>();
+
+        var links = cut.FindAll("a.nav-link");
+        links.Should().Contain(link => link.GetAttribute("href") == "/dashboard" && link.TextContent.Contains("Dashboard"));
+        links.Should().Contain(link => link.GetAttribute("href") == "/solutions" && link.TextContent.Contains("Registered Solutions"));
+        links.Should().Contain(link => link.GetAttribute("href") == "/rules" && link.TextContent.Contains("Authored Rules"));
+        links.Should().Contain(link => link.GetAttribute("href") == "/analysis/rules" && link.TextContent.Contains("Rule Analysis"));
+        links.Should().Contain(link => link.GetAttribute("href") == "/analysis/coverage" && link.TextContent.Contains("Coverage Analysis"));
+
+        links.Select(link => link.GetAttribute("href")).Take(2).Should().Equal("/dashboard", "/solutions");
     }
 }
 
