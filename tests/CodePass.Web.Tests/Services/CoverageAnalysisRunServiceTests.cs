@@ -237,7 +237,10 @@ internal sealed class FakeCoverageAnalyzer : ICoverageAnalyzer
 
     public Exception? ExceptionToThrow { get; set; }
 
-    public Task<CoverageAnalysisResultModel> AnalyzeAsync(string solutionPath, CancellationToken cancellationToken = default)
+    public Task<CoverageAnalysisResultModel> AnalyzeAsync(
+        string solutionPath,
+        CancellationToken cancellationToken = default,
+        IProgress<CoverageAnalysisProgressDto>? progress = null)
     {
         Calls.Add(new CoverageAnalyzeCall(solutionPath));
 

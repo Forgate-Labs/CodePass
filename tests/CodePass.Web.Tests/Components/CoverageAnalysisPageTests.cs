@@ -104,6 +104,44 @@ public sealed class CoverageAnalysisPageTests : TestContext
     }
 
     [Fact]
+    public async Task RunCoverageAnalysis_ShouldRenderProgressWhileRunIsActive()
+    {
+        var solution = CoverageAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var runService = new CoverageAnalysisTestRunService
+        {
+            PendingRun = new TaskCompletionSource<CoverageAnalysisRunDto>(TaskCreationOptions.RunContinuationsAsynchronously)
+        };
+        var resultService = new CoverageAnalysisTestResultService();
+
+        Services.AddSingleton<IRegisteredSolutionService>(new CoverageAnalysisTestRegisteredSolutionService(solution));
+        Services.AddSingleton<ICoverageAnalysisRunService>(runService);
+        Services.AddSingleton<ICoverageAnalysisResultService>(resultService);
+
+        var cut = RenderComponent<CoverageAnalysis>();
+        cut.WaitForAssertion(() => cut.Find("[data-testid='run-coverage-analysis-button']").TextContent.Should().Contain("Run coverage analysis"));
+
+        var clickTask = cut.Find("[data-testid='run-coverage-analysis-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='coverage-analysis-progress']");
+            cut.Find("[data-testid='coverage-analysis-progress-stage']").TextContent.Should().Contain("Running tests");
+            cut.Find("[data-testid='coverage-analysis-progress-message']").TextContent.Should().Contain("dotnet test is running");
+            cut.Find("[data-testid='coverage-analysis-progress-detail']").TextContent.Should().Contain("Passed!  - Failed: 0");
+            cut.Find("[data-testid='coverage-analysis-progress-count']").TextContent.Should().Contain("1 / 3");
+            cut.Find("[data-testid='coverage-analysis-progress-bar']").GetAttribute("aria-valuenow").Should().Be("45");
+        });
+
+        runService.PendingRun.SetResult(CoverageAnalysisComponentTestData.CreateSucceededRun(solution.Id));
+        await clickTask;
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='run-coverage-analysis-button']").TextContent.Should().Contain("Run coverage analysis");
+        });
+    }
+
+    [Fact]
     public async Task RunFailure_ShouldRenderReadableError()
     {
         var solution = CoverageAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
@@ -180,14 +218,30 @@ internal sealed class CoverageAnalysisTestRunService : ICoverageAnalysisRunServi
     public List<Guid> StartCalls { get; } = [];
     public Exception? ErrorToThrow { get; init; }
     public Action<Guid>? OnStart { get; set; }
+    public TaskCompletionSource<CoverageAnalysisRunDto>? PendingRun { get; set; }
 
-    public Task<CoverageAnalysisRunDto> StartRunAsync(Guid registeredSolutionId, CancellationToken cancellationToken = default)
+    public Task<CoverageAnalysisRunDto> StartRunAsync(
+        Guid registeredSolutionId,
+        CancellationToken cancellationToken = default,
+        IProgress<CoverageAnalysisProgressDto>? progress = null)
     {
         StartCalls.Add(registeredSolutionId);
+        progress?.Report(new CoverageAnalysisProgressDto(
+            CoverageAnalysisProgressStage.RunningTests,
+            "dotnet test is running...",
+            PercentComplete: 45,
+            Current: 1,
+            Total: 3,
+            Detail: "Passed!  - Failed: 0"));
 
         if (ErrorToThrow is not null)
         {
             throw ErrorToThrow;
+        }
+
+        if (PendingRun is not null)
+        {
+            return PendingRun.Task;
         }
 
         OnStart?.Invoke(registeredSolutionId);

@@ -35,6 +35,36 @@
         <div class="alert alert-danger" role="alert" data-testid="coverage-analysis-run-error">@RunError</div>
     }
 
+    @if (IsRunInProgress && CurrentProgress is not null)
+    {
+        var percentComplete = CurrentProgress.PercentComplete.GetValueOrDefault();
+        <div class="card shadow-sm border-primary mb-4" data-testid="coverage-analysis-progress" aria-live="polite">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+                    <div>
+                        <p class="text-uppercase text-primary fw-semibold small mb-1" data-testid="coverage-analysis-progress-stage">@FormatProgressStage(CurrentProgress.Stage)</p>
+                        <h2 class="h5 mb-1" data-testid="coverage-analysis-progress-message">@CurrentProgress.Message</h2>
+                        @if (!string.IsNullOrWhiteSpace(CurrentProgress.Detail))
+                        {
+                            <p class="text-body-secondary small mb-0" data-testid="coverage-analysis-progress-detail">@CurrentProgress.Detail</p>
+                        }
+                    </div>
+                    @if (CurrentProgress.Current is not null && CurrentProgress.Total is not null)
+                    {
+                        <span class="badge text-bg-light" data-testid="coverage-analysis-progress-count">@CurrentProgress.Current / @CurrentProgress.Total</span>
+                    }
+                </div>
+
+                @if (CurrentProgress.PercentComplete is not null)
+                {
+                    <div class="progress" role="progressbar" aria-label="Coverage analysis progress" aria-valuenow="@percentComplete" aria-valuemin="0" aria-valuemax="100" data-testid="coverage-analysis-progress-bar">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @percentComplete%">@percentComplete%</div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
     @if (IsLoadingSolutions)
     {
         <div class="card shadow-sm border-0">
@@ -127,6 +157,7 @@
     private bool IsLoadingSolutions { get; set; } = true;
     private bool IsLoadingLatestRun { get; set; }
     private bool IsRunInProgress { get; set; }
+    private CoverageAnalysisProgressDto? CurrentProgress { get; set; }
     private string? LoadError { get; set; }
     private string? RunError { get; set; }
     private RegisteredSolution? SelectedSolution { get; set; }
@@ -209,7 +240,16 @@
         {
             IsRunInProgress = true;
             RunError = null;
-            await CoverageAnalysisRunService.StartRunAsync(SelectedSolution.Id);
+            CurrentProgress = new CoverageAnalysisProgressDto(
+                CoverageAnalysisProgressStage.Preparing,
+                "Preparing coverage analysis...",
+                PercentComplete: 0);
+            var progress = new Progress<CoverageAnalysisProgressDto>(progressUpdate =>
+            {
+                CurrentProgress = progressUpdate;
+                _ = InvokeAsync(StateHasChanged);
+            });
+            await CoverageAnalysisRunService.StartRunAsync(SelectedSolution.Id, progress: progress);
             await LoadLatestRunAsync(SelectedSolution.Id);
         }
         catch (Exception ex)
@@ -221,6 +261,20 @@
             IsRunInProgress = false;
         }
     }
+
+    private static string FormatProgressStage(CoverageAnalysisProgressStage stage)
+        => stage switch
+        {
+            CoverageAnalysisProgressStage.Preparing => "Preparing",
+            CoverageAnalysisProgressStage.CreatingRun => "Creating run",
+            CoverageAnalysisProgressStage.RunningTests => "Running tests",
+            CoverageAnalysisProgressStage.CollectingCoverage => "Collecting coverage",
+            CoverageAnalysisProgressStage.ParsingCoverage => "Parsing coverage",
+            CoverageAnalysisProgressStage.SavingResults => "Saving results",
+            CoverageAnalysisProgressStage.Completed => "Completed",
+            CoverageAnalysisProgressStage.Failed => "Failed",
+            _ => stage.ToString()
+        };
 
     private static string FormatStatus(RegisteredSolutionStatus status)
         => status switch

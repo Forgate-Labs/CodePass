@@ -2,5 +2,8 @@ namespace CodePass.Web.Services.CoverageAnalysis;
 
 public interface ICoverageAnalysisRunService
 {
-    Task<CoverageAnalysisRunDto> StartRunAsync(Guid registeredSolutionId, CancellationToken cancellationToken = default);
+    Task<CoverageAnalysisRunDto> StartRunAsync(
+        Guid registeredSolutionId,
+        CancellationToken cancellationToken = default,
+        IProgress<CoverageAnalysisProgressDto>? progress = null);
 }

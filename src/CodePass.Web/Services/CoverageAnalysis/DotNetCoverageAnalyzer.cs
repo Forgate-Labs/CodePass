@@ -17,7 +17,10 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
         _parser = parser;
     }
 
-    public async Task<CoverageAnalysisResult> AnalyzeAsync(string solutionPath, CancellationToken cancellationToken = default)
+    public async Task<CoverageAnalysisResult> AnalyzeAsync(
+        string solutionPath,
+        CancellationToken cancellationToken = default,
+        IProgress<CoverageAnalysisProgressDto>? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
 
@@ -26,7 +29,9 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
 
         try
         {
-            var output = await RunDotnetCoverageAsync(solutionPath, resultsDirectory, cancellationToken);
+            Report(progress, CoverageAnalysisProgressStage.RunningTests, "Starting dotnet test with XPlat Code Coverage...", percentComplete: 25, detail: solutionPath);
+            var output = await RunDotnetCoverageAsync(solutionPath, resultsDirectory, cancellationToken, progress);
+            Report(progress, CoverageAnalysisProgressStage.CollectingCoverage, "Finding generated Cobertura coverage files...", percentComplete: 75, detail: resultsDirectory);
             var coberturaFiles = Directory
                 .EnumerateFiles(resultsDirectory, "coverage.cobertura.xml", SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.Ordinal)
@@ -40,7 +45,24 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
                     $"dotnet output:{Environment.NewLine}{output}");
             }
 
-            return _parser.Parse(coberturaFiles);
+            Report(
+                progress,
+                CoverageAnalysisProgressStage.ParsingCoverage,
+                $"Parsing {coberturaFiles.Length} Cobertura coverage file(s)...",
+                percentComplete: 85,
+                current: 0,
+                total: coberturaFiles.Length,
+                detail: coberturaFiles[0]);
+            var result = _parser.Parse(coberturaFiles);
+            Report(
+                progress,
+                CoverageAnalysisProgressStage.ParsingCoverage,
+                "Finished parsing normalized coverage results.",
+                percentComplete: 90,
+                current: coberturaFiles.Length,
+                total: coberturaFiles.Length,
+                detail: $"{result.Projects.Count} project(s), {result.Classes.Count} class(es)");
+            return result;
         }
         finally
         {
@@ -51,7 +73,8 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
     private static async Task<string> RunDotnetCoverageAsync(
         string solutionPath,
         string resultsDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<CoverageAnalysisProgressDto>? progress)
     {
         using var process = new Process
         {
@@ -80,6 +103,7 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
             if (args.Data is not null)
             {
                 stdout.AppendLine(args.Data);
+                Report(progress, CoverageAnalysisProgressStage.RunningTests, "dotnet test is running...", percentComplete: 45, detail: args.Data);
             }
         };
         process.ErrorDataReceived += (_, args) =>
@@ -87,6 +111,7 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
             if (args.Data is not null)
             {
                 stderr.AppendLine(args.Data);
+                Report(progress, CoverageAnalysisProgressStage.RunningTests, "dotnet test reported diagnostic output...", percentComplete: 45, detail: args.Data);
             }
         };
 
@@ -95,6 +120,7 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
             throw new InvalidOperationException("Failed to start dotnet test for coverage analysis.");
         }
 
+        Report(progress, CoverageAnalysisProgressStage.RunningTests, "dotnet test process started.", percentComplete: 30, detail: $"PID {process.Id}");
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
@@ -108,6 +134,7 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
             throw;
         }
 
+        Report(progress, CoverageAnalysisProgressStage.CollectingCoverage, "dotnet test completed; collecting coverage output...", percentComplete: 70);
         var combinedOutput = $"STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{stderr}";
         if (process.ExitCode != 0)
         {
@@ -117,6 +144,22 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
 
         return combinedOutput;
     }
+
+    private static void Report(
+        IProgress<CoverageAnalysisProgressDto>? progress,
+        CoverageAnalysisProgressStage stage,
+        string message,
+        int? percentComplete = null,
+        int? current = null,
+        int? total = null,
+        string? detail = null)
+        => progress?.Report(new CoverageAnalysisProgressDto(
+            stage,
+            message,
+            percentComplete,
+            current,
+            total,
+            detail));
 
     private static void TryKill(Process process)
     {
