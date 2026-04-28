@@ -28,9 +28,9 @@
 
 ### Dashboard
 
-- [ ] **DASH-01**: User can see a project score for the current analysis snapshot.
-- [ ] **DASH-02**: User can see whether the current snapshot passes or fails.
-- [ ] **DASH-03**: User can understand how rule results and coverage results contribute to the current score.
+- [x] **DASH-01**: User can see a project score for the current analysis snapshot.
+- [x] **DASH-02**: User can see whether the current snapshot passes or fails.
+- [x] **DASH-03**: User can understand how rule results and coverage results contribute to the current score.
 
 ## v2 Requirements
 
@@ -67,9 +67,9 @@
 | COV-02 | Phase 4 - Coverage Analysis Review | Complete |
 | COV-03 | Phase 4 - Coverage Analysis Review | Complete |
 | COV-04 | Phase 4 - Coverage Analysis Review | Complete |
-| DASH-01 | Phase 5 - Quality Score Dashboard | Pending |
-| DASH-02 | Phase 5 - Quality Score Dashboard | Pending |
-| DASH-03 | Phase 5 - Quality Score Dashboard | Pending |
+| DASH-01 | Phase 5 - Quality Score Dashboard | Complete |
+| DASH-02 | Phase 5 - Quality Score Dashboard | Complete |
+| DASH-03 | Phase 5 - Quality Score Dashboard | Complete |
 
 ---
-*Last updated: 2026-04-28 after Phase 04-06 completion*
+*Last updated: 2026-04-28 after Phase 05-01 completion*
