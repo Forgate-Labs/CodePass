@@ -130,6 +130,9 @@ public sealed class CoverageAnalysisPageTests : TestContext
             cut.Find("[data-testid='coverage-analysis-progress-detail']").TextContent.Should().Contain("Passed!  - Failed: 0");
             cut.Find("[data-testid='coverage-analysis-progress-count']").TextContent.Should().Contain("1 / 3");
             cut.Find("[data-testid='coverage-analysis-progress-bar']").GetAttribute("aria-valuenow").Should().Be("45");
+            cut.Find("[data-testid='coverage-analysis-progress-history']").TextContent.Should().Contain("Execution details");
+            cut.FindAll("[data-testid='coverage-analysis-progress-history-item']").Should().HaveCountGreaterThanOrEqualTo(2);
+            cut.Find("[data-testid='coverage-analysis-progress-history']").TextContent.Should().Contain("Passed!  - Failed: 0");
         });
 
         runService.PendingRun.SetResult(CoverageAnalysisComponentTestData.CreateSucceededRun(solution.Id));

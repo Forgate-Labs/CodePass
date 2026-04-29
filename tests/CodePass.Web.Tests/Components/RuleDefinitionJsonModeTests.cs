@@ -165,8 +165,8 @@ public sealed class RuleDefinitionJsonModeTests : TestContext
         {
             cut.Find("[data-testid='rule-title-input']").GetAttribute("value").Should().Be("Avoid goto");
             cut.Find("[data-testid='rule-severity-input']").GetAttribute("value").Should().Be(nameof(RuleSeverity.Error));
-            cut.Find("[data-testid='string-list-field-targets']").GetAttribute("value").Should().Contain("member_access");
-            cut.Find("[data-testid='string-list-field-syntaxKinds']").GetAttribute("value").Should().Contain("goto");
+            cut.Find("[data-testid='multi-select-field-targets'] option[value='member_access']").HasAttribute("selected").Should().BeTrue();
+            cut.Find("[data-testid='multi-select-field-syntaxKinds'] option[value='goto']").HasAttribute("selected").Should().BeTrue();
         });
     }
 }

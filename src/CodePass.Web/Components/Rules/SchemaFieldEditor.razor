@@ -17,6 +17,21 @@
             <label class="form-check-label" for="@FieldId">Enabled</label>
         </div>
     }
+    else if (IsMultiSelectField)
+    {
+        <select id="@FieldId"
+                class="form-select"
+                multiple
+                size="@MultiSelectSize"
+                @onchange="HandleMultiSelectChangedAsync"
+                data-testid="@MultiSelectTestId">
+            @foreach (var option in Definition.AllowedValues!)
+            {
+                <option value="@option" selected="@SelectedValues.Contains(option, StringComparer.Ordinal)">@option</option>
+            }
+        </select>
+        <div class="form-text">Select one or more values. Use Ctrl/Cmd+click to choose multiple options.</div>
+    }
     else if (IsListField)
     {
         <textarea id="@FieldId"
@@ -72,6 +87,7 @@
     private string StringValue { get; set; } = string.Empty;
     private bool BoolValue { get; set; }
     private string ListValue { get; set; } = string.Empty;
+    private HashSet<string> SelectedValues { get; } = new(StringComparer.Ordinal);
 
     [Parameter, EditorRequired]
     public RuleCatalogFieldDefinition Definition { get; set; } = default!;
@@ -86,14 +102,17 @@
     private string ContainerTestId => $"schema-field-{Definition.Name}";
     private string CheckboxTestId => $"checkbox-field-{Definition.Name}";
     private string StringListTestId => $"string-list-field-{Definition.Name}";
+    private string MultiSelectTestId => $"multi-select-field-{Definition.Name}";
     private string SelectTestId => $"select-field-{Definition.Name}";
     private string TextAreaTestId => $"textarea-field-{Definition.Name}";
     private string TextTestId => $"text-field-{Definition.Name}";
     private string NumberTestId => $"number-field-{Definition.Name}";
     private bool IsBooleanField => Definition.JsonType == "boolean";
     private bool IsListField => Definition.JsonType == "array";
+    private bool IsMultiSelectField => Definition.JsonType == "array" && Definition.AllowedValues is { Count: > 0 };
     private bool IsNumberField => Definition.JsonType == "number";
     private bool IsSelectField => Definition.JsonType == "string" && Definition.AllowedValues is { Count: > 0 };
+    private int MultiSelectSize => Math.Min(Math.Max(Definition.AllowedValues?.Count ?? 2, 2), 8);
     private bool UseTextArea => Definition.JsonType == "string" && Definition.AllowedValues is null && Definition.Name.Contains("regex", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnParametersSet()
@@ -106,9 +125,17 @@
 
         if (IsListField)
         {
-            ListValue = Value is { ValueKind: JsonValueKind.Array }
-                ? string.Join(Environment.NewLine, Value.Value.EnumerateArray().Select(item => item.GetString()).Where(item => !string.IsNullOrWhiteSpace(item)))
-                : string.Empty;
+            var values = Value is { ValueKind: JsonValueKind.Array }
+                ? Value.Value.EnumerateArray().Select(item => item.GetString()).Where(item => !string.IsNullOrWhiteSpace(item)).ToArray()
+                : [];
+
+            ListValue = string.Join(Environment.NewLine, values);
+            SelectedValues.Clear();
+            foreach (var item in values)
+            {
+                SelectedValues.Add(item!);
+            }
+
             return;
         }
 
@@ -149,4 +176,33 @@
         var items = value.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(items));
     }
+
+    private Task HandleMultiSelectChangedAsync(ChangeEventArgs args)
+    {
+        var values = ExtractSelectedValues(args.Value);
+        SelectedValues.Clear();
+        foreach (var value in values)
+        {
+            SelectedValues.Add(value);
+        }
+
+        return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(values));
+    }
+
+    private static string[] ExtractSelectedValues(object? value)
+    {
+        return value switch
+        {
+            null => [],
+            string stringValue when string.IsNullOrWhiteSpace(stringValue) => [],
+            string stringValue => [stringValue],
+            string[] stringValues => CleanValues(stringValues),
+            IEnumerable<string> stringValues => CleanValues(stringValues),
+            IEnumerable<object> objectValues => CleanValues(objectValues.Select(item => item.ToString())),
+            _ => []
+        };
+    }
+
+    private static string[] CleanValues(IEnumerable<string?> values)
+        => values.Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item!).ToArray();
 }

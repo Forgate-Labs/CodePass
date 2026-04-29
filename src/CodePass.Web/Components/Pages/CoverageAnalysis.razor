@@ -61,6 +61,27 @@
                         <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @percentComplete%">@percentComplete%</div>
                     </div>
                 }
+
+                @if (ProgressHistory.Count > 0)
+                {
+                    <div class="mt-3 border-top pt-3" data-testid="coverage-analysis-progress-history">
+                        <p class="text-uppercase text-body-secondary fw-semibold small mb-2">Execution details</p>
+                        <ol class="list-unstyled d-flex flex-column gap-2 mb-0 small">
+                            @foreach (var progressItem in ProgressHistory)
+                            {
+                                <li class="d-flex flex-column flex-md-row gap-1 gap-md-2" data-testid="coverage-analysis-progress-history-item">
+                                    <span class="text-body-secondary flex-shrink-0">@progressItem.UpdatedAtUtc.ToLocalTime().ToString("HH:mm:ss")</span>
+                                    <span class="fw-semibold flex-shrink-0">@FormatProgressStage(progressItem.Stage)</span>
+                                    <span>@progressItem.Message</span>
+                                    @if (!string.IsNullOrWhiteSpace(progressItem.Detail))
+                                    {
+                                        <code class="text-break">@progressItem.Detail</code>
+                                    }
+                                </li>
+                            }
+                        </ol>
+                    </div>
+                }
             </div>
         </div>
     }
@@ -158,6 +179,7 @@
     private bool IsLoadingLatestRun { get; set; }
     private bool IsRunInProgress { get; set; }
     private CoverageAnalysisProgressDto? CurrentProgress { get; set; }
+    private List<CoverageAnalysisProgressDto> ProgressHistory { get; } = [];
     private string? LoadError { get; set; }
     private string? RunError { get; set; }
     private RegisteredSolution? SelectedSolution { get; set; }
@@ -244,9 +266,12 @@
                 CoverageAnalysisProgressStage.Preparing,
                 "Preparing coverage analysis...",
                 PercentComplete: 0);
+            ProgressHistory.Clear();
+            AddProgressHistory(CurrentProgress);
             var progress = new Progress<CoverageAnalysisProgressDto>(progressUpdate =>
             {
                 CurrentProgress = progressUpdate;
+                AddProgressHistory(progressUpdate);
                 _ = InvokeAsync(StateHasChanged);
             });
             await CoverageAnalysisRunService.StartRunAsync(SelectedSolution.Id, progress: progress);
@@ -259,6 +284,15 @@
         finally
         {
             IsRunInProgress = false;
+        }
+    }
+
+    private void AddProgressHistory(CoverageAnalysisProgressDto progressUpdate)
+    {
+        ProgressHistory.Add(progressUpdate);
+        if (ProgressHistory.Count > 12)
+        {
+            ProgressHistory.RemoveRange(0, ProgressHistory.Count - 12);
         }
     }
 

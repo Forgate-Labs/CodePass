@@ -66,8 +66,8 @@ public sealed class RuleDefinitionsPageTests : TestContext
         await cut.Find("[data-testid='rule-title-input']").ChangeAsync(new ChangeEventArgs { Value = "Avoid var" });
         await cut.Find("[data-testid='rule-kind-select']").ChangeAsync(new ChangeEventArgs { Value = "syntax_presence" });
         await cut.Find("[data-testid='select-field-mode']").ChangeAsync(new ChangeEventArgs { Value = "forbid" });
-        await cut.Find("[data-testid='string-list-field-targets']").ChangeAsync(new ChangeEventArgs { Value = "local_declaration" });
-        await cut.Find("[data-testid='string-list-field-syntaxKinds']").ChangeAsync(new ChangeEventArgs { Value = "var" });
+        await cut.Find("[data-testid='multi-select-field-targets']").ChangeAsync(new ChangeEventArgs { Value = new[] { "local_declaration" } });
+        await cut.Find("[data-testid='multi-select-field-syntaxKinds']").ChangeAsync(new ChangeEventArgs { Value = new[] { "var" } });
         await cut.Find("form").SubmitAsync();
 
         cut.WaitForAssertion(() =>

@@ -26,8 +26,8 @@ public sealed class RuleDefinitionEditorTests : TestContext
         {
             cut.Find("[data-testid='dynamic-schema-section']").TextContent.Should().Contain("Syntax presence policy");
             cut.Find("[data-testid='select-field-mode']").GetAttribute("value").Should().Be("forbid");
-            cut.Find("[data-testid='string-list-field-targets']").GetAttribute("value").Should().Contain("local_declaration");
-            cut.Find("[data-testid='string-list-field-syntaxKinds']").GetAttribute("value").Should().Contain("var");
+            cut.Find("[data-testid='multi-select-field-targets'] option[value='local_declaration']").HasAttribute("selected").Should().BeTrue();
+            cut.Find("[data-testid='multi-select-field-syntaxKinds'] option[value='var']").HasAttribute("selected").Should().BeTrue();
             cut.Find("[data-testid='checkbox-field-allowInTests']").HasAttribute("checked").Should().BeFalse();
         });
     }
@@ -95,8 +95,8 @@ public sealed class RuleDefinitionEditorTests : TestContext
         await cut.Find("[data-testid='rule-title-input']").ChangeAsync(new ChangeEventArgs { Value = "Prefer member access" });
         await cut.Find("[data-testid='rule-kind-select']").ChangeAsync(new ChangeEventArgs { Value = "syntax_presence" });
         await cut.Find("[data-testid='select-field-mode']").ChangeAsync(new ChangeEventArgs { Value = "require" });
-        await cut.Find("[data-testid='string-list-field-targets']").ChangeAsync(new ChangeEventArgs { Value = "member_access" });
-        await cut.Find("[data-testid='string-list-field-syntaxKinds']").ChangeAsync(new ChangeEventArgs { Value = "goto" });
+        await cut.Find("[data-testid='multi-select-field-targets']").ChangeAsync(new ChangeEventArgs { Value = new[] { "member_access" } });
+        await cut.Find("[data-testid='multi-select-field-syntaxKinds']").ChangeAsync(new ChangeEventArgs { Value = new[] { "goto" } });
         await cut.Find("form").SubmitAsync();
 
         cut.WaitForAssertion(() =>

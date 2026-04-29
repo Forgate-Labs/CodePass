@@ -22,7 +22,7 @@ public sealed class RuleCatalogService : IRuleCatalogService
             ParameterFields:
             [
                 CreateField("mode", "Mode", "Whether matching syntax is forbidden or required.", "string", true, Serialize("forbid"), ["forbid", "require"]),
-                CreateField("targets", "Targets", "Closed target contexts for the syntax policy.", "array", true, Serialize(new[] { "local_declaration" })),
+                CreateField("targets", "Targets", "Closed target contexts for the syntax policy.", "array", true, Serialize(new[] { "local_declaration" }), ["local_declaration", "foreach_variable", "for_initializer", "using_declaration", "lambda_parameter", "field_declaration", "property_declaration", "method_declaration", "class_declaration", "record_declaration", "member_access"]),
                 CreateField("syntaxKinds", "Syntax kinds", "Supported syntax constructs to check.", "array", true, Serialize(new[] { "var" }), ["var", "goto", "expression_bodied_member", "missing_braces"]),
                 CreateField("allowInTests", "Allow in tests", "Whether test projects can opt out.", "boolean", false, Serialize(false))
             ]),

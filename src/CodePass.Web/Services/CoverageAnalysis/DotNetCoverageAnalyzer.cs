@@ -95,6 +95,9 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
         process.StartInfo.ArgumentList.Add(resultsDirectory);
         process.StartInfo.ArgumentList.Add("--nologo");
 
+        var commandPreview = BuildCommandPreview(process.StartInfo);
+        Report(progress, CoverageAnalysisProgressStage.RunningTests, "Prepared dotnet test command.", percentComplete: 28, detail: commandPreview);
+
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
 
@@ -103,7 +106,7 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
             if (args.Data is not null)
             {
                 stdout.AppendLine(args.Data);
-                Report(progress, CoverageAnalysisProgressStage.RunningTests, "dotnet test is running...", percentComplete: 45, detail: args.Data);
+                ReportDotNetOutput(progress, args.Data);
             }
         };
         process.ErrorDataReceived += (_, args) =>
@@ -134,7 +137,7 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
             throw;
         }
 
-        Report(progress, CoverageAnalysisProgressStage.CollectingCoverage, "dotnet test completed; collecting coverage output...", percentComplete: 70);
+        Report(progress, CoverageAnalysisProgressStage.CollectingCoverage, $"dotnet test completed with exit code {process.ExitCode}; collecting coverage output...", percentComplete: 70);
         var combinedOutput = $"STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{stderr}";
         if (process.ExitCode != 0)
         {
@@ -143,6 +146,62 @@ public sealed class DotNetCoverageAnalyzer : ICoverageAnalyzer
         }
 
         return combinedOutput;
+    }
+
+    private static void ReportDotNetOutput(IProgress<CoverageAnalysisProgressDto>? progress, string outputLine)
+    {
+        var (stage, message, percentComplete) = ClassifyDotNetOutput(outputLine);
+        Report(progress, stage, message, percentComplete: percentComplete, detail: outputLine);
+    }
+
+    private static (CoverageAnalysisProgressStage Stage, string Message, int PercentComplete) ClassifyDotNetOutput(string outputLine)
+    {
+        if (outputLine.Contains("Determining projects to restore", StringComparison.OrdinalIgnoreCase))
+        {
+            return (CoverageAnalysisProgressStage.RunningTests, "Restoring test project dependencies...", 34);
+        }
+
+        if (outputLine.Contains("All projects are up-to-date for restore", StringComparison.OrdinalIgnoreCase)
+            || outputLine.Contains("Restored ", StringComparison.OrdinalIgnoreCase))
+        {
+            return (CoverageAnalysisProgressStage.RunningTests, "Restore completed; building test projects...", 38);
+        }
+
+        if (outputLine.Contains("Starting test execution", StringComparison.OrdinalIgnoreCase))
+        {
+            return (CoverageAnalysisProgressStage.RunningTests, "Starting discovered test execution...", 45);
+        }
+
+        if (outputLine.Contains("Passed!", StringComparison.OrdinalIgnoreCase)
+            || outputLine.Contains("Failed!", StringComparison.OrdinalIgnoreCase))
+        {
+            return (CoverageAnalysisProgressStage.RunningTests, "Test execution summary received.", 65);
+        }
+
+        if (outputLine.Contains("Attachments:", StringComparison.OrdinalIgnoreCase)
+            || outputLine.Contains("coverage.cobertura.xml", StringComparison.OrdinalIgnoreCase))
+        {
+            return (CoverageAnalysisProgressStage.CollectingCoverage, "Coverage attachment output detected.", 68);
+        }
+
+        if (outputLine.Contains(" -> ", StringComparison.Ordinal) && outputLine.Contains(".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            return (CoverageAnalysisProgressStage.RunningTests, "Build output produced for a test project.", 42);
+        }
+
+        return (CoverageAnalysisProgressStage.RunningTests, "dotnet test is running...", 45);
+    }
+
+    private static string BuildCommandPreview(ProcessStartInfo startInfo)
+    {
+        return string.Join(' ', new[] { startInfo.FileName }.Concat(startInfo.ArgumentList.Select(QuoteArgument)));
+    }
+
+    private static string QuoteArgument(string argument)
+    {
+        return argument.Contains(' ', StringComparison.Ordinal) || argument.Contains('"', StringComparison.Ordinal)
+            ? $"\"{argument.Replace("\"", "\\\"")}\""
+            : argument;
     }
 
     private static void Report(
