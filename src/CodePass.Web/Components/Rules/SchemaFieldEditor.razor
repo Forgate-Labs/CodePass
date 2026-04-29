@@ -40,6 +40,15 @@
             }
         </select>
     }
+    else if (IsNumberField)
+    {
+        <input id="@FieldId"
+               class="form-control"
+               type="number"
+               value="@StringValue"
+               @onchange="HandleNumberChangedAsync"
+               data-testid="@NumberTestId" />
+    }
     else if (UseTextArea)
     {
         <textarea id="@FieldId"
@@ -80,8 +89,10 @@
     private string SelectTestId => $"select-field-{Definition.Name}";
     private string TextAreaTestId => $"textarea-field-{Definition.Name}";
     private string TextTestId => $"text-field-{Definition.Name}";
+    private string NumberTestId => $"number-field-{Definition.Name}";
     private bool IsBooleanField => Definition.JsonType == "boolean";
     private bool IsListField => Definition.JsonType == "array";
+    private bool IsNumberField => Definition.JsonType == "number";
     private bool IsSelectField => Definition.JsonType == "string" && Definition.AllowedValues is { Count: > 0 };
     private bool UseTextArea => Definition.JsonType == "string" && Definition.AllowedValues is null && Definition.Name.Contains("regex", StringComparison.OrdinalIgnoreCase);
 
@@ -101,7 +112,12 @@
             return;
         }
 
-        StringValue = Value is { ValueKind: JsonValueKind.String } ? Value.Value.GetString() ?? string.Empty : string.Empty;
+        StringValue = Value switch
+        {
+            { ValueKind: JsonValueKind.String } => Value.Value.GetString() ?? string.Empty,
+            { ValueKind: JsonValueKind.Number } => Value.Value.GetRawText(),
+            _ => string.Empty
+        };
     }
 
     private Task HandleStringChangedAsync(ChangeEventArgs args)
@@ -115,6 +131,15 @@
     {
         BoolValue = args.Value is bool value && value;
         return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(BoolValue));
+    }
+
+    private Task HandleNumberChangedAsync(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        StringValue = value;
+        return int.TryParse(value, out var intValue)
+            ? ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(intValue))
+            : ValueChanged.InvokeAsync(null);
     }
 
     private Task HandleListChangedAsync(ChangeEventArgs args)

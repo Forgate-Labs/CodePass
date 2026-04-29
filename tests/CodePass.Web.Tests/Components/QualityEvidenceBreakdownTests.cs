@@ -31,7 +31,7 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
         ruleCard.TextContent.Should().Contain("Open rule analysis");
         ruleCard.QuerySelector("a")!.GetAttribute("href").Should().Be("/analysis/rules");
 
-        cut.Find("[data-testid='rule-contribution-points']").TextContent.Should().Be("35/50");
+        cut.Find("[data-testid='rule-contribution-points']").TextContent.Should().Be("70/100");
         cut.Find("[data-testid='rule-total-violations']").TextContent.Should().Be("6");
         cut.Find("[data-testid='rule-error-count']").TextContent.Should().Be("1");
         cut.Find("[data-testid='rule-warning-count']").TextContent.Should().Be("2");
@@ -53,7 +53,7 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
         coverageCard.TextContent.Should().Contain("Open coverage analysis");
         coverageCard.QuerySelector("a")!.GetAttribute("href").Should().Be("/analysis/coverage");
 
-        cut.Find("[data-testid='coverage-contribution-points']").TextContent.Should().Be("41.5/50");
+        cut.Find("[data-testid='coverage-contribution-points']").TextContent.Should().Be("83/100");
         cut.Find("[data-testid='coverage-line-percent']").TextContent.Should().Be("83.0%");
         cut.Find("[data-testid='coverage-line-counts']").TextContent.Should().Be("83/100");
         cut.Find("[data-testid='coverage-latest-status']").TextContent.Should().Be("Succeeded");
@@ -65,7 +65,7 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
     {
         var snapshot = CreateSnapshot(
             new QualityRuleContributionDto(
-                50,
+                100,
                 0,
                 QualityEvidenceStatus.Failed,
                 0,
@@ -75,7 +75,7 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
                 "Rule analysis failed before producing violations.",
                 ["Rule analysis failed: project could not be loaded."]),
             new QualityCoverageContributionDto(
-                50,
+                100,
                 0,
                 QualityEvidenceStatus.Missing,
                 null,
@@ -105,8 +105,8 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
             76.5,
             QualityScoreStatus.Fail,
             ruleContribution ?? new QualityRuleContributionDto(
-                50,
-                35,
+                100,
+                70,
                 QualityEvidenceStatus.Succeeded,
                 1,
                 2,
@@ -115,8 +115,8 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
                 "Rule analysis found 6 violations.",
                 []),
             coverageContribution ?? new QualityCoverageContributionDto(
-                50,
-                41.5,
+                100,
+                83,
                 QualityEvidenceStatus.Succeeded,
                 83,
                 83,

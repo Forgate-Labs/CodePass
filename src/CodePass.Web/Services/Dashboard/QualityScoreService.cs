@@ -8,8 +8,8 @@ public sealed class QualityScoreService(
     IRuleAnalysisResultService ruleAnalysisResultService,
     ICoverageAnalysisResultService coverageAnalysisResultService) : IQualityScoreService
 {
-    private const double RuleMaxPoints = 50;
-    private const double CoverageMaxPoints = 50;
+    private const double RuleMaxPoints = 100;
+    private const double CoverageMaxPoints = 100;
 
     public async Task<QualityScoreSnapshotDto> GetCurrentSnapshotAsync(
         Guid registeredSolutionId,
@@ -18,9 +18,9 @@ public sealed class QualityScoreService(
         var ruleRun = await ruleAnalysisResultService.GetLatestRunForSolutionAsync(registeredSolutionId, cancellationToken);
         var coverageRun = await coverageAnalysisResultService.GetLatestRunForSolutionAsync(registeredSolutionId, cancellationToken);
 
-        var ruleContribution = BuildRuleContribution(ruleRun);
+        var ruleContribution = BuildRuleContribution(ruleRun, coverageRun?.TotalLineCount);
         var coverageContribution = BuildCoverageContribution(coverageRun);
-        var score = RoundPoints(ruleContribution.EarnedPoints + coverageContribution.EarnedPoints);
+        var score = RoundPoints((ruleContribution.EarnedPoints + coverageContribution.EarnedPoints) / 2);
         var blockingReasons = ruleContribution.BlockingReasons.Concat(coverageContribution.BlockingReasons).ToList();
         var status = IsPassingSnapshot(score, ruleRun, coverageRun, ruleContribution)
             ? QualityScoreStatus.Pass
@@ -35,7 +35,7 @@ public sealed class QualityScoreService(
             blockingReasons);
     }
 
-    private static QualityRuleContributionDto BuildRuleContribution(RuleAnalysisRunDto? run)
+    private static QualityRuleContributionDto BuildRuleContribution(RuleAnalysisRunDto? run, int? totalLineCount)
     {
         if (run is null)
         {
@@ -82,13 +82,19 @@ public sealed class QualityScoreService(
                 BlockingReasons: [reason]);
         }
 
-        var earnedPoints = Clamp(
-            RuleMaxPoints - (20 * errorCount) - (5 * warningCount) - infoCount,
-            min: 0,
-            max: RuleMaxPoints);
+        var scoringLineCount = totalLineCount.GetValueOrDefault();
+        var incorrectLineCount = CountViolationLines(run);
+        var warningLineCount = CountWarningOnlyViolationLines(run);
+        var earnedPoints = CalculateRuleScore(
+            scoringLineCount,
+            incorrectLineCount,
+            warningLineCount,
+            totalViolations);
         var summary = totalViolations == 0
             ? "Rule-analysis evidence succeeded with no violations."
-            : $"Rule-analysis evidence succeeded with {errorCount} errors, {warningCount} warnings, and {infoCount} info findings.";
+            : scoringLineCount > 0
+                ? $"Rule-analysis evidence succeeded with {errorCount} errors, {warningCount} warnings, and {infoCount} info findings across {incorrectLineCount} affected line(s) out of {scoringLineCount} total line(s)."
+                : $"Rule-analysis evidence succeeded with {errorCount} errors, {warningCount} warnings, and {infoCount} info findings.";
 
         return new QualityRuleContributionDto(
             RuleMaxPoints,
@@ -143,7 +149,7 @@ public sealed class QualityScoreService(
                 BlockingReasons: [reason]);
         }
 
-        var earnedPoints = RoundPoints(Clamp(run.LineCoveragePercent / 2, min: 0, max: CoverageMaxPoints));
+        var earnedPoints = RoundPoints(Clamp(run.LineCoveragePercent, min: 0, max: CoverageMaxPoints));
         var summary = $"Coverage-analysis evidence succeeded with {run.LineCoveragePercent:0.#}% line coverage.";
 
         return new QualityCoverageContributionDto(
@@ -174,6 +180,48 @@ public sealed class QualityScoreService(
         return run.RuleGroups
             .Where(group => group.Severity == severity)
             .Sum(group => group.ViolationCount);
+    }
+
+    private static int CountViolationLines(RuleAnalysisRunDto run)
+    {
+        return run.RuleGroups
+            .SelectMany(group => group.Violations)
+            .Select(violation => new { violation.FilePath, violation.StartLine })
+            .Distinct()
+            .Count();
+    }
+
+    private static int CountWarningOnlyViolationLines(RuleAnalysisRunDto run)
+    {
+        return run.RuleGroups
+            .SelectMany(group => group.Violations.Select(violation => new
+            {
+                violation.FilePath,
+                violation.StartLine,
+                group.Severity
+            }))
+            .GroupBy(violation => new { violation.FilePath, violation.StartLine })
+            .Count(group => group.All(violation => violation.Severity == RuleSeverity.Warning));
+    }
+
+    private static double CalculateRuleScore(
+        int totalLineCount,
+        int incorrectLineCount,
+        int warningLineCount,
+        int totalViolations)
+    {
+        if (totalLineCount <= 0)
+        {
+            return totalViolations == 0 ? RuleMaxPoints : 0;
+        }
+
+        var normalizedIncorrectLineCount = Math.Min(incorrectLineCount, totalLineCount);
+        var normalizedWarningLineCount = Math.Min(warningLineCount, normalizedIncorrectLineCount);
+        var correctLineCount = totalLineCount - normalizedIncorrectLineCount;
+        var penalizedIncorrectLineCount = normalizedIncorrectLineCount - normalizedWarningLineCount;
+        var score = (correctLineCount - penalizedIncorrectLineCount) / (double)totalLineCount * RuleMaxPoints;
+
+        return RoundPoints(Clamp(score, min: 0, max: RuleMaxPoints));
     }
 
     private static QualityEvidenceStatus MapRuleStatus(RuleAnalysisRunStatus status)

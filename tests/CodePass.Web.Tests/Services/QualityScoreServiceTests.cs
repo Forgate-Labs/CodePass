@@ -20,14 +20,14 @@ public sealed class QualityScoreServiceTests
 
         snapshot.Score.Should().Be(100);
         snapshot.Status.Should().Be(QualityScoreStatus.Pass);
-        snapshot.RuleContribution.EarnedPoints.Should().Be(50);
-        snapshot.RuleContribution.MaxPoints.Should().Be(50);
+        snapshot.RuleContribution.EarnedPoints.Should().Be(100);
+        snapshot.RuleContribution.MaxPoints.Should().Be(100);
         snapshot.RuleContribution.ErrorCount.Should().Be(0);
         snapshot.RuleContribution.WarningCount.Should().Be(0);
         snapshot.RuleContribution.InfoCount.Should().Be(0);
         snapshot.RuleContribution.TotalViolations.Should().Be(0);
-        snapshot.CoverageContribution.EarnedPoints.Should().Be(50);
-        snapshot.CoverageContribution.MaxPoints.Should().Be(50);
+        snapshot.CoverageContribution.EarnedPoints.Should().Be(100);
+        snapshot.CoverageContribution.MaxPoints.Should().Be(100);
         snapshot.CoverageContribution.LineCoveragePercent.Should().Be(100);
         snapshot.BlockingReasons.Should().BeEmpty();
     }
@@ -48,14 +48,14 @@ public sealed class QualityScoreServiceTests
 
         var snapshot = await service.GetCurrentSnapshotAsync(registeredSolutionId);
 
-        snapshot.Score.Should().Be(65);
+        snapshot.Score.Should().Be(88.5);
         snapshot.Status.Should().Be(QualityScoreStatus.Fail);
-        snapshot.RuleContribution.EarnedPoints.Should().Be(25);
+        snapshot.RuleContribution.EarnedPoints.Should().Be(97);
         snapshot.RuleContribution.ErrorCount.Should().Be(1);
         snapshot.RuleContribution.WarningCount.Should().Be(1);
         snapshot.RuleContribution.InfoCount.Should().Be(0);
         snapshot.RuleContribution.TotalViolations.Should().Be(2);
-        snapshot.CoverageContribution.EarnedPoints.Should().Be(40);
+        snapshot.CoverageContribution.EarnedPoints.Should().Be(80);
         snapshot.CoverageContribution.LineCoveragePercent.Should().Be(80);
         snapshot.BlockingReasons.Should().BeEmpty();
     }
@@ -132,7 +132,7 @@ public sealed class QualityScoreServiceTests
                     "test_rule",
                     severity,
                     $"{severity} violation {index}",
-                    $"src/File{index}.cs",
+                    $"src/{severity}File{index}.cs",
                     index,
                     1,
                     index,

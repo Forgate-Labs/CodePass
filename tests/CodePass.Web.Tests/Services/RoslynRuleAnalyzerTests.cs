@@ -108,6 +108,182 @@ public sealed class RoslynRuleAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ShouldReportMissingRequiredAttribute()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1007",
+            title: "Classes require marker attribute",
+            kind: "attribute_policy",
+            severity: RuleSeverity.Warning,
+            parametersJson: "{\"mode\":\"require\",\"targetKinds\":[\"class\"],\"attributes\":[\"Serializable\"],\"matchInherited\":false}",
+            scopeJson: "{\"files\":[\"SampleProject/PolicyTarget.cs\"],\"excludeFiles\":[]}");
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        findings.Should().ContainSingle();
+        findings[0].RuleKind.Should().Be("attribute_policy");
+        findings[0].Message.Should().Contain("requires");
+        findings[0].Message.Should().Contain("Serializable");
+        AssertHasLocation(findings[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldReportForbiddenDependencyNamespace()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            using System.Text;
+
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public string Run()
+                {
+                    return new StringBuilder().Append("Hello").ToString();
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1008",
+            title: "No System.Text dependency",
+            kind: "dependency_policy",
+            severity: RuleSeverity.Error,
+            parametersJson: "{\"sourceNamespaces\":[\"SampleProject\"],\"forbiddenNamespaces\":[\"System.Text\"],\"forbiddenTypes\":[]}");
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        findings.Should().NotBeEmpty();
+        findings.Should().OnlyContain(finding => finding.RuleKind == "dependency_policy");
+        findings.Should().Contain(finding => finding.Message.Contains("System.Text", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldReportMethodMetricsViolation()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public int Run(int first, int second, int third)
+                {
+                    if (first > 0)
+                    {
+                        return second;
+                    }
+
+                    return third;
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1009",
+            title: "Small methods only",
+            kind: "method_metrics",
+            severity: RuleSeverity.Warning,
+            parametersJson: "{\"maxLines\":20,\"maxParameters\":2,\"maxCyclomaticComplexity\":10}");
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        findings.Should().ContainSingle();
+        findings[0].RuleKind.Should().Be("method_metrics");
+        findings[0].Message.Should().Contain("parameters exceeds");
+        AssertHasLocation(findings[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldReportExceptionHandlingViolations()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            using System;
+
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public void Run()
+                {
+                    try
+                    {
+                        throw new InvalidOperationException();
+                    }
+                    catch (Exception ex)
+                    {
+                        throw ex;
+                    }
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1010",
+            title: "Safe exception handling",
+            kind: "exception_handling",
+            severity: RuleSeverity.Error,
+            parametersJson: "{\"forbidEmptyCatch\":true,\"forbidCatchAll\":true,\"forbidThrowEx\":true,\"requireLogging\":false}");
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        findings.Should().HaveCount(2);
+        findings.Should().Contain(finding => finding.Message.Contains("catch-all", StringComparison.OrdinalIgnoreCase));
+        findings.Should().Contain(finding => finding.Message.Contains("throw ex", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ShouldReportAsyncPolicyViolations()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            using System.Threading.Tasks;
+
+            namespace SampleProject;
+
+            public sealed class PolicyTarget
+            {
+                public async void FireAndForget()
+                {
+                    await Task.Delay(1);
+                }
+
+                public async Task Run()
+                {
+                    var task = Task.Delay(1);
+                    task.Wait();
+                    await task;
+                }
+            }
+            """);
+
+        var rule = CreateRule(
+            code: "CP1011",
+            title: "Safe async usage",
+            kind: "async_policy",
+            severity: RuleSeverity.Warning,
+            parametersJson: "{\"forbidAsyncVoid\":true,\"requireCancellationToken\":true,\"forbidBlockingCalls\":true}");
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, [rule]);
+
+        findings.Should().HaveCount(4);
+        findings.Should().Contain(finding => finding.Message.Contains("async void", StringComparison.OrdinalIgnoreCase));
+        findings.Should().Contain(finding => finding.Message.Contains("CancellationToken", StringComparison.Ordinal));
+        findings.Should().Contain(finding => finding.Message.Contains("blocking async calls", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_ShouldReturnNoFindingsForEmptyRuleList()
     {
         var findings = await new RoslynRuleAnalyzer().AnalyzeAsync("/tmp/missing-solution.sln", []);

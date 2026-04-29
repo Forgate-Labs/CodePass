@@ -119,6 +119,26 @@ public sealed class RuleDefinitionServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_ShouldAcceptNumberFieldsForMethodMetricsRules()
+    {
+        await using var fixture = await RuleDefinitionServiceFixture.CreateAsync();
+
+        var created = await fixture.Service.CreateAsync(new SaveAuthoredRuleDefinitionRequest(
+            Code: "CP2000",
+            Title: "Limit method metrics",
+            Description: null,
+            RuleKind: "method_metrics",
+            SchemaVersion: "1.0",
+            Severity: RuleSeverity.Warning,
+            ScopeJson: ValidScopeJson,
+            ParametersJson: "{\"maxLines\":50,\"maxParameters\":5,\"maxCyclomaticComplexity\":10}",
+            IsEnabled: true));
+
+        created.RuleKind.Should().Be("method_metrics");
+        created.ParametersJson.Should().Be("{\"maxLines\":50,\"maxParameters\":5,\"maxCyclomaticComplexity\":10}");
+    }
+
+    [Fact]
     public async Task RuleServices_ShouldResolveFromDependencyInjection()
     {
         var services = new ServiceCollection();

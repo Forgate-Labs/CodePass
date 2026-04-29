@@ -19,11 +19,12 @@ Make it easy to run lightweight, deeply .NET-native code analysis locally and de
 - [ ] Users can register a .NET solution by providing the local path to a `.sln` file.
 - [ ] Users can manually trigger rule analysis for a registered solution and inspect violations grouped by rule with severity.
 - [ ] Users can manually trigger coverage analysis for a registered solution and inspect unit test coverage by class.
-- [ ] Admin users can create and edit custom analysis rules through a structured DSL model backed by schemas.
+- [ ] Admin users can create and edit custom analysis rules from scratch through a structured DSL model backed by schemas.
 - [ ] The web UI shows a project score/dashboard that makes it obvious whether the code currently “passes”.
 
 ### Out of Scope
 
+- Built-in default production rules or rule packs — v1 should validate user-authored rules first; examples in the repository are enough for learning.
 - GitHub and Azure DevOps integration — defer until the core local/self-hosted workflow is proven.
 - Automatic scheduling or pipeline-triggered analysis — manual execution is enough for v1 validation.
 - Execution history and trend analysis — current pass/fail clarity matters more than historical reporting in v1.
@@ -35,9 +36,9 @@ Make it easy to run lightweight, deeply .NET-native code analysis locally and de
 
 The project is motivated by frustration with existing general-purpose tools such as SonarQube: they are powerful, but feel generic, infrastructure-heavy, and not deeply tailored to the .NET experience. CodePass should feel native to the .NET ecosystem, be easy to run locally for free, and stay closely aligned with Roslyn rather than abstracting away from it.
 
-The envisioned product has a Blazor Server frontend for management and reporting. Users add projects by supplying a `.sln` path on a machine where the self-hosted CodePass instance already has filesystem access. In v1, rule analysis and coverage analysis are separate manual actions.
+The envisioned product has a Blazor Server frontend for management and reporting. Users add projects by supplying a `.sln` path on a machine where the self-hosted CodePass instance already has filesystem access. In v1, rule analysis and coverage analysis are separate manual actions. For persistence, v1 should favor SQLite to keep local setup lightweight and free of extra infrastructure.
 
-Custom rules are the product’s strategic differentiator. The current preferred approach is a structured DSL rather than free-form natural language: a closed catalog of rule kinds, schemas per rule kind, JSON-backed rule instances, and Roslyn-based executors. The frontend should help authors assemble rules from schemas while also allowing direct JSON editing when needed.
+Custom rules are the product’s strategic differentiator. The current preferred approach is a structured DSL rather than free-form natural language: schemas for supported rule shapes, JSON-backed rule instances, and Roslyn-based executors. The frontend should help authors assemble rules from schemas while also allowing direct JSON editing when needed. In v1, CodePass should not ship with built-in production rules; active rules are authored by the user, with repository examples allowed only as learning material.
 
 The first user is primarily the project creator, but the product should also be credible for internal teams, small and medium .NET teams, and tech leads or architects later. The project also serves as proof that a focused .NET-first platform can solve a real problem with a more opinionated and efficient design.
 
@@ -49,6 +50,7 @@ All implementation code must be written in English.
 
 - **Tech stack**: .NET 10 with Blazor Server — chosen to keep the full product deeply aligned with the .NET ecosystem.
 - **Execution model**: Self-hosted with local filesystem access to the target `.sln` path — because v1 is optimized for easy local use.
+- **Persistence**: SQLite in v1 — because local-first simplicity matters more than multi-instance scalability right now.
 - **Analysis engine**: Roslyn-centered rule execution — because the product should be intimately tied to .NET semantics, not text matching.
 - **Rule authoring model**: Structured DSL with schemas and a closed rule catalog — because custom rules must be easy to validate, evolve, and render in the UI.
 - **Scope**: C#/.NET only in v1 — because focus is a competitive advantage, not a limitation.
@@ -64,6 +66,7 @@ All implementation code must be written in English.
 | Use schema-driven rule forms with optional raw JSON editing | The UI should help authors, but advanced users still need direct control | — Pending |
 | Start with self-hosted local-path analysis of `.sln` files | This is the simplest way to deliver value quickly with low infrastructure overhead | — Pending |
 | Keep rule analysis and coverage analysis as separate manual actions in v1 | It reduces complexity while preserving the two main user outcomes | — Pending |
+| Use SQLite for persistence in v1 | It keeps the self-hosted local setup lightweight and avoids extra infrastructure early on | — Pending |
 | Keep all implementation code in English | Consistency and maintainability across the codebase | — Pending |
 
 ---

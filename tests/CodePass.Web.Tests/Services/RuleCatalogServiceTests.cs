@@ -12,7 +12,15 @@ public sealed class RuleCatalogServiceTests
 
         var catalog = await service.GetRuleKindsAsync();
 
-        catalog.Select(rule => rule.Kind).Should().Equal("syntax_presence", "forbidden_api_usage", "symbol_naming");
+        catalog.Select(rule => rule.Kind).Should().Equal(
+            "syntax_presence",
+            "forbidden_api_usage",
+            "symbol_naming",
+            "attribute_policy",
+            "dependency_policy",
+            "method_metrics",
+            "exception_handling",
+            "async_policy");
         catalog.Should().OnlyContain(rule => rule.SchemaVersion == "1.0");
         catalog.Should().OnlyContain(rule => rule.Language == "csharp");
         catalog.Should().OnlyContain(rule => rule.ScopeFields.Count > 0);

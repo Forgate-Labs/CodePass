@@ -187,8 +187,8 @@ internal static class DashboardComponentTestData
             score,
             status,
             new QualityRuleContributionDto(
-                50,
-                status == QualityScoreStatus.Pass ? 50 : 20,
+                100,
+                status == QualityScoreStatus.Pass ? 100 : 40,
                 QualityEvidenceStatus.Succeeded,
                 status == QualityScoreStatus.Pass ? 0 : 1,
                 status == QualityScoreStatus.Pass ? 0 : 2,
@@ -197,8 +197,8 @@ internal static class DashboardComponentTestData
                 status == QualityScoreStatus.Pass ? "Rule analysis found no violations." : "Rule analysis found 3 violations.",
                 status == QualityScoreStatus.Pass ? [] : ["Rule-analysis violations block a passing score."]),
             new QualityCoverageContributionDto(
-                50,
-                status == QualityScoreStatus.Pass ? 41.5 : 20,
+                100,
+                status == QualityScoreStatus.Pass ? 83 : 40,
                 QualityEvidenceStatus.Succeeded,
                 status == QualityScoreStatus.Pass ? 83 : 40,
                 status == QualityScoreStatus.Pass ? 83 : 40,

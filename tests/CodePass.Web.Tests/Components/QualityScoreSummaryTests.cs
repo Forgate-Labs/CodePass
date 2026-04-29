@@ -77,8 +77,8 @@ public sealed class QualityScoreSummaryTests : TestContext
             score,
             status,
             new QualityRuleContributionDto(
-                50,
-                status == QualityScoreStatus.Pass ? 50 : 10,
+                100,
+                status == QualityScoreStatus.Pass ? 100 : 20,
                 QualityEvidenceStatus.Succeeded,
                 status == QualityScoreStatus.Pass ? 0 : 2,
                 status == QualityScoreStatus.Pass ? 0 : 1,
@@ -87,8 +87,8 @@ public sealed class QualityScoreSummaryTests : TestContext
                 "Rule evidence summary",
                 []),
             new QualityCoverageContributionDto(
-                50,
-                status == QualityScoreStatus.Pass ? 42.5 : 35,
+                100,
+                status == QualityScoreStatus.Pass ? 85 : 70,
                 QualityEvidenceStatus.Succeeded,
                 85,
                 85,

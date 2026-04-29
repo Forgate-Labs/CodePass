@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.CodeAnalysis.Text;
 
 namespace CodePass.Web.Services.RuleAnalysis;
 
@@ -98,7 +99,7 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
                     detail: relativePath);
 
                 var applicableRules = rules
-                    .Where(rule => IsRuleInScope(rule, relativePath))
+                    .Where(rule => IsRuleInScope(rule, relativePath, project.Name))
                     .ToArray();
 
                 if (applicableRules.Length == 0)
@@ -138,6 +139,31 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
                                 findings.AddRange(AnalyzeSymbolNaming(rule, root, semanticModel, relativePath, cancellationToken));
                             }
 
+                            break;
+                        case "attribute_policy":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzeAttributePolicy(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
+                        case "dependency_policy":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzeDependencyPolicy(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
+                        case "method_metrics":
+                            findings.AddRange(AnalyzeMethodMetrics(rule, root, relativePath, cancellationToken));
+                            break;
+                        case "exception_handling":
+                            findings.AddRange(AnalyzeExceptionHandling(rule, root, relativePath, cancellationToken));
+                            break;
+                        case "async_policy":
+                            findings.AddRange(AnalyzeAsyncPolicy(rule, root, relativePath, cancellationToken));
                             break;
                     }
                 }
@@ -380,6 +406,296 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         return findings;
     }
 
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeAttributePolicy(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var mode = GetString(parameters, "mode") ?? "require";
+        var targetKinds = GetStringArray(parameters, "targetKinds").Select(value => value.Trim().ToLowerInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var attributes = GetStringArray(parameters, "attributes").Select(NormalizeAttributeName).Where(value => value.Length > 0).ToArray();
+        var matchInherited = GetBoolean(parameters, "matchInherited");
+
+        if (targetKinds.Count == 0 || attributes.Length == 0)
+        {
+            return [];
+        }
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var candidate in EnumerateDeclaredSymbols(root, semanticModel, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!targetKinds.Contains(candidate.Kind))
+            {
+                continue;
+            }
+
+            var matchingAttribute = FindMatchingAttribute(candidate.Symbol, attributes, matchInherited);
+            if (string.Equals(mode, "forbid", StringComparison.OrdinalIgnoreCase))
+            {
+                if (matchingAttribute is not null)
+                {
+                    findings.Add(CreateFinding(
+                        rule,
+                        $"Rule '{rule.Code}' forbids attribute '{matchingAttribute}' on {candidate.Kind} '{candidate.Symbol.Name}'.",
+                        relativePath,
+                        candidate.Location));
+                }
+
+                continue;
+            }
+
+            if (matchingAttribute is null)
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' requires one of these attributes on {candidate.Kind} '{candidate.Symbol.Name}': {string.Join(", ", attributes)}.",
+                    relativePath,
+                    candidate.Location));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeDependencyPolicy(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var sourceNamespaces = GetStringArray(parameters, "sourceNamespaces").ToArray();
+        var forbiddenNamespaces = GetStringArray(parameters, "forbiddenNamespaces").ToArray();
+        var forbiddenTypes = GetStringArray(parameters, "forbiddenTypes").ToArray();
+
+        if (forbiddenNamespaces.Length == 0 && forbiddenTypes.Length == 0)
+        {
+            return [];
+        }
+
+        var declaredNamespace = root.DescendantNodes()
+            .OfType<BaseNamespaceDeclarationSyntax>()
+            .Select(ns => ns.Name.ToString())
+            .FirstOrDefault() ?? string.Empty;
+        if (sourceNamespaces.Length > 0 && !sourceNamespaces.Any(source => NamespaceMatches(declaredNamespace, source)))
+        {
+            return [];
+        }
+
+        var findings = new List<RuleAnalysisFinding>();
+        var reportedLocations = new HashSet<TextSpan>();
+
+        foreach (var usingDirective in root.DescendantNodes().OfType<UsingDirectiveSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var namespaceName = usingDirective.Name?.ToString() ?? string.Empty;
+            var forbiddenNamespace = forbiddenNamespaces.FirstOrDefault(forbidden => NamespaceMatches(namespaceName, forbidden));
+            if (forbiddenNamespace is not null && reportedLocations.Add(usingDirective.Span))
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' forbids dependency on namespace '{forbiddenNamespace}'.",
+                    relativePath,
+                    usingDirective.GetLocation()));
+            }
+        }
+
+        foreach (var node in root.DescendantNodes().Where(IsDependencySyntaxNode))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!reportedLocations.Add(node.Span))
+            {
+                continue;
+            }
+
+            var symbol = semanticModel.GetSymbolInfo(node, cancellationToken).Symbol;
+            if (symbol is null)
+            {
+                symbol = semanticModel.GetTypeInfo(node, cancellationToken).Type;
+            }
+
+            var forbiddenType = forbiddenTypes.FirstOrDefault(forbidden => SymbolTypeMatches(symbol, forbidden));
+            if (forbiddenType is not null)
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' forbids dependency on type '{forbiddenType}'.",
+                    relativePath,
+                    node.GetLocation()));
+                continue;
+            }
+
+            var forbiddenNamespace = forbiddenNamespaces.FirstOrDefault(forbidden => SymbolNamespaceMatches(symbol, forbidden));
+            if (forbiddenNamespace is not null)
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' forbids dependency on namespace '{forbiddenNamespace}'.",
+                    relativePath,
+                    node.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeMethodMetrics(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var maxLines = GetInt(parameters, "maxLines") ?? 50;
+        var maxParameters = GetInt(parameters, "maxParameters") ?? 5;
+        var maxCyclomaticComplexity = GetInt(parameters, "maxCyclomaticComplexity") ?? 10;
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var violations = new List<string>();
+            var lineCount = CountLines(method.GetLocation());
+            var parameterCount = method.ParameterList.Parameters.Count;
+            var complexity = CalculateCyclomaticComplexity(method);
+
+            if (maxLines > 0 && lineCount > maxLines)
+            {
+                violations.Add($"{lineCount} lines exceeds {maxLines}");
+            }
+
+            if (maxParameters > 0 && parameterCount > maxParameters)
+            {
+                violations.Add($"{parameterCount} parameters exceeds {maxParameters}");
+            }
+
+            if (maxCyclomaticComplexity > 0 && complexity > maxCyclomaticComplexity)
+            {
+                violations.Add($"cyclomatic complexity {complexity} exceeds {maxCyclomaticComplexity}");
+            }
+
+            if (violations.Count > 0)
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' method '{method.Identifier.ValueText}' violates metrics policy: {string.Join("; ", violations)}.",
+                    relativePath,
+                    method.Identifier.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeExceptionHandling(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var forbidEmptyCatch = GetBoolean(parameters, "forbidEmptyCatch", defaultValue: true);
+        var forbidCatchAll = GetBoolean(parameters, "forbidCatchAll", defaultValue: true);
+        var forbidThrowEx = GetBoolean(parameters, "forbidThrowEx", defaultValue: true);
+        var requireLogging = GetBoolean(parameters, "requireLogging");
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var catchClause in root.DescendantNodes().OfType<CatchClauseSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (forbidEmptyCatch && (catchClause.Block?.Statements.Count ?? 0) == 0)
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids empty catch blocks.", relativePath, catchClause.GetLocation()));
+            }
+
+            if (forbidCatchAll && IsCatchAll(catchClause))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids catch-all exception handlers.", relativePath, catchClause.Declaration?.GetLocation() ?? catchClause.GetLocation()));
+            }
+
+            if (requireLogging && !CatchBlockHasLogging(catchClause))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' requires logging inside catch blocks.", relativePath, catchClause.GetLocation()));
+            }
+        }
+
+        if (forbidThrowEx)
+        {
+            foreach (var throwStatement in root.DescendantNodes().OfType<ThrowStatementSyntax>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (throwStatement.Expression is IdentifierNameSyntax identifier)
+                {
+                    findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids rethrowing captured exceptions with 'throw {identifier.Identifier.ValueText};'.", relativePath, throwStatement.GetLocation()));
+                }
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeAsyncPolicy(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var forbidAsyncVoid = GetBoolean(parameters, "forbidAsyncVoid", defaultValue: true);
+        var requireCancellationToken = GetBoolean(parameters, "requireCancellationToken", defaultValue: true);
+        var forbidBlockingCalls = GetBoolean(parameters, "forbidBlockingCalls", defaultValue: true);
+        var findings = new List<RuleAnalysisFinding>();
+
+        foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var isAsync = method.Modifiers.Any(SyntaxKind.AsyncKeyword);
+            if (!isAsync)
+            {
+                continue;
+            }
+
+            if (forbidAsyncVoid && method.ReturnType is PredefinedTypeSyntax predefinedType && predefinedType.Keyword.IsKind(SyntaxKind.VoidKeyword))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids async void method '{method.Identifier.ValueText}'.", relativePath, method.Identifier.GetLocation()));
+            }
+
+            if (requireCancellationToken
+                && method.Modifiers.Any(SyntaxKind.PublicKeyword)
+                && !method.ParameterList.Parameters.Any(ParameterIsCancellationToken))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' requires public async method '{method.Identifier.ValueText}' to accept a CancellationToken.", relativePath, method.Identifier.GetLocation()));
+            }
+        }
+
+        if (forbidBlockingCalls)
+        {
+            foreach (var node in root.DescendantNodes().Where(IsAsyncBlockingCall))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids blocking async calls such as Result, Wait, or GetResult.", relativePath, node.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
     private static IEnumerable<DeclaredSymbolCandidate> EnumerateDeclaredSymbols(SyntaxNode root, SemanticModel semanticModel, CancellationToken cancellationToken)
     {
         foreach (var declaration in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
@@ -457,6 +773,190 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         return accessibilities.Count == 0 || accessibilities.Contains(symbol.DeclaredAccessibility.ToString().ToLowerInvariant());
     }
 
+    private static string? FindMatchingAttribute(ISymbol symbol, IReadOnlyList<string> expectedAttributes, bool matchInherited)
+    {
+        var attributeSymbols = symbol.GetAttributes()
+            .Select(attribute => attribute.AttributeClass)
+            .OfType<INamedTypeSymbol>()
+            .ToList();
+
+        if (matchInherited && symbol is INamedTypeSymbol namedType)
+        {
+            for (var baseType = namedType.BaseType; baseType is not null; baseType = baseType.BaseType)
+            {
+                attributeSymbols.AddRange(baseType.GetAttributes().Select(attribute => attribute.AttributeClass).OfType<INamedTypeSymbol>());
+            }
+        }
+
+        foreach (var attributeSymbol in attributeSymbols)
+        {
+            var candidates = new[]
+            {
+                NormalizeAttributeName(attributeSymbol.Name),
+                NormalizeAttributeName(attributeSymbol.ToDisplayString(SymbolDisplayFormat))
+            };
+
+            var matchingAttribute = expectedAttributes.FirstOrDefault(expected => candidates.Contains(expected, StringComparer.Ordinal));
+            if (matchingAttribute is not null)
+            {
+                return matchingAttribute;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeAttributeName(string attributeName)
+    {
+        var normalized = NormalizeSymbolName(attributeName.Trim());
+        const string suffix = "Attribute";
+        return normalized.EndsWith(suffix, StringComparison.Ordinal)
+            ? normalized[..^suffix.Length]
+            : normalized;
+    }
+
+    private static bool NamespaceMatches(string namespaceName, string expectedNamespace)
+    {
+        if (string.IsNullOrWhiteSpace(namespaceName) || string.IsNullOrWhiteSpace(expectedNamespace))
+        {
+            return false;
+        }
+
+        var normalizedNamespace = namespaceName.Trim();
+        var normalizedExpected = expectedNamespace.Trim();
+        return string.Equals(normalizedNamespace, normalizedExpected, StringComparison.Ordinal)
+            || normalizedNamespace.StartsWith(normalizedExpected + ".", StringComparison.Ordinal);
+    }
+
+    private static bool SymbolNamespaceMatches(ISymbol? symbol, string expectedNamespace)
+    {
+        if (symbol is null)
+        {
+            return false;
+        }
+
+        var namespaceName = symbol switch
+        {
+            INamedTypeSymbol typeSymbol => typeSymbol.ContainingNamespace?.ToDisplayString(),
+            IMethodSymbol methodSymbol => methodSymbol.ContainingType?.ContainingNamespace?.ToDisplayString(),
+            IPropertySymbol propertySymbol => propertySymbol.ContainingType?.ContainingNamespace?.ToDisplayString(),
+            IFieldSymbol fieldSymbol => fieldSymbol.ContainingType?.ContainingNamespace?.ToDisplayString(),
+            _ => symbol.ContainingNamespace?.ToDisplayString()
+        };
+
+        return NamespaceMatches(namespaceName ?? string.Empty, expectedNamespace);
+    }
+
+    private static bool SymbolTypeMatches(ISymbol? symbol, string expectedType)
+    {
+        if (symbol is null || string.IsNullOrWhiteSpace(expectedType))
+        {
+            return false;
+        }
+
+        var typeSymbol = symbol switch
+        {
+            INamedTypeSymbol namedType => namedType,
+            IMethodSymbol methodSymbol => methodSymbol.ContainingType,
+            IPropertySymbol propertySymbol => propertySymbol.ContainingType,
+            IFieldSymbol fieldSymbol => fieldSymbol.ContainingType,
+            _ => symbol.ContainingType
+        };
+
+        if (typeSymbol is null)
+        {
+            return false;
+        }
+
+        var normalizedExpected = NormalizeSymbolName(expectedType.Trim());
+        var candidates = new[]
+        {
+            typeSymbol.Name,
+            NormalizeSymbolName(typeSymbol.ToDisplayString(SymbolDisplayFormat))
+        };
+
+        return candidates.Any(candidate => string.Equals(candidate, normalizedExpected, StringComparison.Ordinal));
+    }
+
+    private static bool IsDependencySyntaxNode(SyntaxNode node)
+    {
+        return node switch
+        {
+            ObjectCreationExpressionSyntax => true,
+            AttributeSyntax => true,
+            IdentifierNameSyntax identifier => identifier.Parent is not MemberAccessExpressionSyntax,
+            QualifiedNameSyntax => true,
+            GenericNameSyntax => true,
+            MemberAccessExpressionSyntax => true,
+            _ => false
+        };
+    }
+
+    private static int CountLines(Location location)
+    {
+        var lineSpan = location.GetLineSpan();
+        return Math.Max(1, lineSpan.EndLinePosition.Line - lineSpan.StartLinePosition.Line + 1);
+    }
+
+    private static int CalculateCyclomaticComplexity(MethodDeclarationSyntax method)
+    {
+        var complexity = 1;
+        foreach (var node in method.DescendantNodes())
+        {
+            complexity += node switch
+            {
+                IfStatementSyntax => 1,
+                ForStatementSyntax => 1,
+                ForEachStatementSyntax => 1,
+                WhileStatementSyntax => 1,
+                DoStatementSyntax => 1,
+                CaseSwitchLabelSyntax => 1,
+                ConditionalExpressionSyntax => 1,
+                BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LogicalAndExpression) || binary.IsKind(SyntaxKind.LogicalOrExpression) => 1,
+                _ => 0
+            };
+        }
+
+        return complexity;
+    }
+
+    private static bool IsCatchAll(CatchClauseSyntax catchClause)
+    {
+        var typeName = catchClause.Declaration?.Type.ToString();
+        return string.IsNullOrWhiteSpace(typeName)
+            || string.Equals(typeName, "Exception", StringComparison.Ordinal)
+            || string.Equals(typeName, "System.Exception", StringComparison.Ordinal);
+    }
+
+    private static bool CatchBlockHasLogging(CatchClauseSyntax catchClause)
+    {
+        return catchClause.Block?.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Any(invocation =>
+            {
+                var expression = invocation.Expression.ToString();
+                return expression.Contains("Log", StringComparison.Ordinal)
+                    || expression.Contains("logger", StringComparison.OrdinalIgnoreCase);
+            }) == true;
+    }
+
+    private static bool ParameterIsCancellationToken(ParameterSyntax parameter)
+    {
+        var typeName = parameter.Type?.ToString();
+        return string.Equals(typeName, "CancellationToken", StringComparison.Ordinal)
+            || string.Equals(typeName, "System.Threading.CancellationToken", StringComparison.Ordinal);
+    }
+
+    private static bool IsAsyncBlockingCall(SyntaxNode node)
+    {
+        return node switch
+        {
+            MemberAccessExpressionSyntax memberAccess when memberAccess.Name.Identifier.ValueText == "Result" => true,
+            InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax memberAccess } when memberAccess.Name.Identifier.ValueText is "Wait" or "GetResult" => true,
+            _ => false
+        };
+    }
+
     private static bool MatchesSymbol(ISymbol? symbol, string forbiddenSymbol)
     {
         if (symbol is null || string.IsNullOrWhiteSpace(forbiddenSymbol))
@@ -521,14 +1021,16 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
             EndColumn: lineSpan.EndLinePosition.Character + 1);
     }
 
-    private static bool IsRuleInScope(AuthoredRuleDefinitionDto rule, string relativePath)
+    private static bool IsRuleInScope(AuthoredRuleDefinitionDto rule, string relativePath, string projectName)
     {
         using var scopeDocument = ParseRuleJsonDocument(rule, rule.ScopeJson, "scope JSON");
         var scope = scopeDocument.RootElement;
+        var projects = GetStringArray(scope, "projects").DefaultIfEmpty("*").ToArray();
         var files = GetStringArray(scope, "files").DefaultIfEmpty("**/*.cs").ToArray();
         var excludeFiles = GetStringArray(scope, "excludeFiles").ToArray();
 
-        return files.Any(pattern => GlobMatches(pattern, relativePath))
+        return projects.Any(pattern => GlobMatches(pattern, projectName))
+            && files.Any(pattern => GlobMatches(pattern, relativePath))
             && !excludeFiles.Any(pattern => GlobMatches(pattern, relativePath));
     }
 
@@ -596,6 +1098,23 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
+    }
+
+    private static bool GetBoolean(JsonElement element, string propertyName, bool defaultValue = false)
+    {
+        return element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? property.GetBoolean()
+                : defaultValue;
+    }
+
+    private static int? GetInt(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.Number
+            && property.TryGetInt32(out var value)
+                ? value
+                : null;
     }
 
     private static IReadOnlyList<string> GetStringArray(JsonElement element, string propertyName)

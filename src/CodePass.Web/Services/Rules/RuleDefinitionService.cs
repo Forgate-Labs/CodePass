@@ -239,7 +239,8 @@ public sealed class RuleDefinitionService(
         {
             "string" => value.ValueKind == JsonValueKind.String,
             "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
-            "array" => value.ValueKind == JsonValueKind.Array,
+            "number" => value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out _),
+            "array" => value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String),
             "object" => value.ValueKind == JsonValueKind.Object,
             _ => false
         };
