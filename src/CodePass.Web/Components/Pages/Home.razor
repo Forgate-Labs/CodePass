@@ -1,9 +1,14 @@
 @page "/"
+@inject NavigationManager NavigationManager
 
-<PageTitle>Registered Solutions</PageTitle>
+<PageTitle>CodePass</PageTitle>
 
 <div class="container py-4">
-    <h1 class="mb-3">Registered Solutions</h1>
-    <p class="lead">CodePass starts with trusted local <code>.sln</code> registration backed by SQLite.</p>
-    <p>The solution registry foundation is ready for the create, update, remove, and status workflows coming next.</p>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4 text-center">
+            <h1 class="mb-3">CodePass</h1>
+            <p class="lead mb-4">Start by choosing the solution workspace you want to inspect.</p>
+            <a class="btn btn-primary" href="/solutions">Choose solution</a>
+        </div>
+    </div>
 </div>

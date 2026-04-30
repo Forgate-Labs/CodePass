@@ -1,3 +1,6 @@
+@implements IDisposable
+@inject NavigationManager NavigationManager
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">CodePass</a>
@@ -8,30 +11,70 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/dashboard">
-                <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/solutions">
-                <span class="bi bi-folder2-open" aria-hidden="true"></span> Registered Solutions
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/rules">
-                <span class="bi bi-journal-code" aria-hidden="true"></span> Authored Rules
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/analysis/rules">
-                <span class="bi bi-search" aria-hidden="true"></span> Rule Analysis
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/analysis/coverage">
-                <span class="bi bi-bar-chart-line" aria-hidden="true"></span> Coverage Analysis
-            </NavLink>
-        </div>
+        @if (CurrentSolutionId is null)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/solutions">
+                    <span class="bi bi-folder2-open" aria-hidden="true"></span> Solutions
+                </NavLink>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@WorkspaceHref("dashboard")">
+                    <span class="bi bi-speedometer2" aria-hidden="true"></span> Score
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@WorkspaceHref("analysis/rules")">
+                    <span class="bi bi-search" aria-hidden="true"></span> Rule Analysis
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@WorkspaceHref("analysis/coverage")">
+                    <span class="bi bi-bar-chart-line" aria-hidden="true"></span> Coverage Analysis
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@WorkspaceHref("settings")">
+                    <span class="bi bi-gear" aria-hidden="true"></span> Settings
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
+
+@code {
+    private Guid? CurrentSolutionId => TryGetCurrentSolutionId();
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+
+    private string WorkspaceHref(string section)
+        => CurrentSolutionId is Guid solutionId ? $"/solutions/{solutionId}/{section}" : "/solutions";
+
+    private Guid? TryGetCurrentSolutionId()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?', '#')[0];
+        var segments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        return segments.Length >= 2
+            && segments[0].Equals("solutions", StringComparison.OrdinalIgnoreCase)
+            && Guid.TryParse(segments[1], out var solutionId)
+                ? solutionId
+                : null;
+    }
+}

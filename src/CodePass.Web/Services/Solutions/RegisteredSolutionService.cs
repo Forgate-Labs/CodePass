@@ -30,6 +30,7 @@ public sealed class RegisteredSolutionService(
             Status = validation.Status,
             StatusMessage = validation.Message,
             LastValidatedAtUtc = utcNow,
+            QualityScorePassThreshold = 80,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow
         };

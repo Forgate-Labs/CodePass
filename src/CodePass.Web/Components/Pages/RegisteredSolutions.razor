@@ -4,13 +4,13 @@
 @using CodePass.Web.Services.Solutions
 @inject IRegisteredSolutionService RegisteredSolutionService
 
-<PageTitle>Registered Solutions</PageTitle>
+<PageTitle>Solutions</PageTitle>
 
 <div class="container py-4">
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="mb-1">Registered Solutions</h1>
-            <p class="text-body-secondary mb-0">Manage the local <code>.sln</code> files that CodePass can analyze.</p>
+            <h1 class="mb-1">Solutions</h1>
+            <p class="text-body-secondary mb-0">Choose the current workspace or manage the local <code>.sln</code> files that CodePass can analyze.</p>
         </div>
 
         <button class="btn btn-primary align-self-start" type="button" @onclick="OpenRegisterModal">
@@ -36,7 +36,7 @@
         <div class="card shadow-sm border-0">
             <div class="card-body p-4 text-center">
                 <h2 class="h4 mb-2">No registered solutions yet</h2>
-                <p class="text-body-secondary mb-3">Start by selecting a <code>.sln</code> file and confirming the local path you want CodePass to store.</p>
+                <p class="text-body-secondary mb-3">Start by registering a <code>.sln</code> file. After that, open it as the current workspace from this same screen.</p>
                 <button class="btn btn-outline-primary" type="button" @onclick="OpenRegisterModal">Register your first solution</button>
             </div>
         </div>

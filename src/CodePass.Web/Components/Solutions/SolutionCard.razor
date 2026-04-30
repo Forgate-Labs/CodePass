@@ -22,7 +22,11 @@
             <dd class="col-sm-8 mb-0" data-testid="solution-last-validated">@GetLastValidatedText(Solution.LastValidatedAtUtc)</dd>
         </dl>
 
-        <div class="mt-auto d-flex justify-content-end">
+        <div class="mt-auto d-flex flex-wrap gap-2 justify-content-end">
+            <a class="btn btn-primary @(Solution.Status == RegisteredSolutionStatus.Valid ? null : "disabled")"
+               aria-disabled="@(Solution.Status == RegisteredSolutionStatus.Valid ? "false" : "true")"
+               href="@WorkspaceHref(Solution.Id)"
+               data-testid="open-solution-workspace-link">Open workspace</a>
             <button type="button" class="btn btn-outline-secondary" @onclick="HandleManageClicked" data-testid="manage-solution-button">Manage</button>
         </div>
     </div>
@@ -37,6 +41,9 @@
 
     private Task HandleManageClicked()
         => OnManage.InvokeAsync(Solution);
+
+    private static string WorkspaceHref(Guid solutionId)
+        => $"/solutions/{solutionId}/dashboard";
 
     private static string GetStatusLabel(RegisteredSolutionStatus status) => status switch
     {

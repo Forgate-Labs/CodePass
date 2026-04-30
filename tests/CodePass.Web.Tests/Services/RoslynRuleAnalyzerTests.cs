@@ -431,7 +431,7 @@ public sealed class RoslynRuleAnalyzerTests
             var rootPath = Path.Combine(Path.GetTempPath(), "codepass-roslyn-analyzer-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(rootPath);
 
-            RunDotnet(rootPath, "new", "sln", "--name", "SampleSolution");
+            RunDotnet(rootPath, "new", "sln", "--name", "SampleSolution", "--format", "sln");
             RunDotnet(rootPath, "new", "classlib", "--name", "SampleProject", "--framework", "net10.0");
 
             var sourcePath = Path.Combine(rootPath, "SampleProject", "PolicyTarget.cs");

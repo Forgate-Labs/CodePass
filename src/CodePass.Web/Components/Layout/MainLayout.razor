@@ -1,4 +1,6 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager NavigationManager
 
 <div class="page">
     <div class="sidebar">
@@ -7,7 +9,10 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            @if (IsInsideWorkspace)
+            {
+                <a href="/solutions">Sair</a>
+            }
         </div>
 
         <article class="content px-4">
@@ -21,3 +26,34 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool IsInsideWorkspace => TryGetCurrentSolutionId() is not null;
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+
+    private Guid? TryGetCurrentSolutionId()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?', '#')[0];
+        var segments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        return segments.Length >= 2
+            && segments[0].Equals("solutions", StringComparison.OrdinalIgnoreCase)
+            && Guid.TryParse(segments[1], out var solutionId)
+                ? solutionId
+                : null;
+    }
+}

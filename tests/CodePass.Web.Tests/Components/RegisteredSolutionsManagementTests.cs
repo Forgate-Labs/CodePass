@@ -42,6 +42,25 @@ public sealed class RegisteredSolutionsManagementTests : TestContext
     }
 
     [Fact]
+    public void OpenWorkspace_ShouldNavigateToSolutionScoreDashboard()
+    {
+        var solution = CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var service = new FakeRegisteredSolutionService(solution);
+        Services.AddSingleton<IRegisteredSolutionService>(service);
+        Services.AddSingleton<ISolutionPathValidator>(new FakeSolutionPathValidator(path => new SolutionPathValidationResult(RegisteredSolutionStatus.Valid, path, "Valid")));
+
+        var cut = RenderComponent<RegisteredSolutions>();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='open-solution-workspace-link']")
+                .GetAttribute("href")
+                .Should()
+                .Be($"/solutions/{solution.Id}/dashboard");
+        });
+    }
+
+    [Fact]
     public void StatusBadge_ShouldRenderHumanReadableStatusText()
     {
         var service = new FakeRegisteredSolutionService(

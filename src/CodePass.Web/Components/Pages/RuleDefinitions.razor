@@ -1,4 +1,5 @@
 @page "/rules"
+@page "/solutions/{RegisteredSolutionId:guid}/rules"
 @using CodePass.Web.Components.Rules
 @using CodePass.Web.Services.Rules
 @inject IRuleDefinitionService RuleDefinitionService
@@ -9,7 +10,7 @@
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="mb-1">Authored Rules</h1>
-            <p class="text-body-secondary mb-0">Review the user-authored rules currently stored in CodePass. Supported rule kinds stay behind the authoring workflow and are never listed here as pseudo-rules.</p>
+            <p class="text-body-secondary mb-0">Review user-authored rules inside the selected solution workspace. Supported rule kinds stay behind the authoring workflow and are never listed here as pseudo-rules.</p>
         </div>
 
         <button class="btn btn-primary align-self-start" type="button" @onclick="OpenCreateEditor" data-testid="create-rule-button">
@@ -64,6 +65,9 @@
     private string? LoadError { get; set; }
     private AuthoredRuleDefinitionDto? SelectedRule { get; set; }
     private IReadOnlyList<AuthoredRuleDefinitionDto> Rules { get; set; } = Array.Empty<AuthoredRuleDefinitionDto>();
+
+    [Parameter]
+    public Guid? RegisteredSolutionId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

@@ -37,6 +37,13 @@ public static class CodePassDatabaseInitializer
                 cancellationToken);
         }
 
+        if (!await ColumnExistsAsync(dbContext, "RegisteredSolutions", "QualityScorePassThreshold", cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE \"RegisteredSolutions\" ADD COLUMN \"QualityScorePassThreshold\" REAL NOT NULL DEFAULT 80;",
+                cancellationToken);
+        }
+
         await dbContext.Database.ExecuteSqlRawAsync(
             "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_AuthoredRuleDefinitions_Code\" ON \"AuthoredRuleDefinitions\" (\"Code\");",
             cancellationToken);
@@ -221,6 +228,41 @@ public static class CodePassDatabaseInitializer
         await dbContext.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS \"IX_CoverageClassCoverages_ClassName\" ON \"CoverageClassCoverages\" (\"ClassName\");",
             cancellationToken);
+    }
+
+    private static async Task<bool> ColumnExistsAsync(CodePassDbContext dbContext, string tableName, string columnName, CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info(\"{tableName}\");";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (reader.GetString(1).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     private static async Task<bool> TableExistsAsync(CodePassDbContext dbContext, string tableName, CancellationToken cancellationToken)

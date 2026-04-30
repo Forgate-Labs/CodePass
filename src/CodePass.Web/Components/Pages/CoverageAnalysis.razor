@@ -1,4 +1,5 @@
 @page "/analysis/coverage"
+@page "/solutions/{RegisteredSolutionId:guid}/analysis/coverage"
 @using CodePass.Web.Components.CoverageAnalysis
 @using CodePass.Web.Data.Entities
 @using CodePass.Web.Services.CoverageAnalysis
@@ -13,7 +14,7 @@
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="mb-1">Coverage Analysis</h1>
-            <p class="text-body-secondary mb-0">Choose a registered solution, run coverage analysis manually, and review the latest normalized coverage results.</p>
+            <p class="text-body-secondary mb-0">Run coverage analysis manually and review the latest normalized coverage results for the selected solution workspace.</p>
         </div>
 
         <button class="btn btn-primary align-self-start"
@@ -105,48 +106,30 @@
     }
     else
     {
-        <section class="mb-4" aria-labelledby="coverage-solution-selection-heading">
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                <div>
-                    <h2 class="h4 mb-1" id="coverage-solution-selection-heading">Select a solution</h2>
-                    <p class="text-body-secondary mb-0">CodePass defaults to the first valid registered solution when one is available.</p>
+        @if (Solutions.Count > 1)
+        {
+            <div class="card shadow-sm border-0 mb-4" data-testid="coverage-analysis-solution-selector">
+                <div class="card-body">
+                    <p class="text-body-secondary small text-uppercase fw-semibold mb-2">Solution workspace</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var solution in Solutions)
+                        {
+                            <button type="button"
+                                    class="btn btn-sm @(SelectedSolution?.Id == solution.Id ? "btn-primary" : "btn-outline-secondary")"
+                                    data-testid="select-solution-button"
+                                    @onclick="() => SelectSolutionAsync(solution)">
+                                @solution.DisplayName
+                            </button>
+                        }
+                    </div>
                 </div>
             </div>
-
-            <div class="row g-3" data-testid="coverage-analysis-solution-list">
-                @foreach (var solution in Solutions)
-                {
-                    var isSelected = SelectedSolution?.Id == solution.Id;
-                    <div class="col-12 col-xl-6" data-testid="coverage-analysis-solution-card">
-                        <button class="card h-100 w-100 text-start shadow-sm @(isSelected ? "border-primary" : "border-0")"
-                                type="button"
-                                @onclick="() => SelectSolutionAsync(solution.Id)"
-                                aria-pressed="@isSelected.ToString().ToLowerInvariant()"
-                                data-testid="select-solution-button">
-                            <div class="card-body">
-                                <div class="d-flex align-items-start justify-content-between gap-3 mb-2">
-                                    <div>
-                                        <h3 class="h5 mb-1" data-testid="coverage-analysis-solution-name">@solution.DisplayName</h3>
-                                        <p class="text-body-secondary small mb-0" data-testid="coverage-analysis-solution-path">@solution.SolutionPath</p>
-                                    </div>
-                                    <span class="badge @GetSolutionStatusBadgeClass(solution.Status)" data-testid="coverage-analysis-solution-status">@FormatStatus(solution.Status)</span>
-                                </div>
-
-                                @if (!string.IsNullOrWhiteSpace(solution.StatusMessage))
-                                {
-                                    <p class="small text-body-secondary mb-0">@solution.StatusMessage</p>
-                                }
-                            </div>
-                        </button>
-                    </div>
-                }
-            </div>
-        </section>
+        }
 
         @if (SelectedSolution is null)
         {
             <div class="alert alert-warning" role="alert" data-testid="coverage-no-valid-solution-message">
-                No valid registered solution is available yet. Select a solution above to inspect its latest coverage run or see why a new run cannot complete.
+                No selected valid solution is available. Choose a solution workspace before reviewing coverage evidence. <a href="/solutions" class="alert-link">Choose solution</a>.
             </div>
         }
         else
@@ -186,6 +169,9 @@
     private CoverageAnalysisRunDto? LatestRun { get; set; }
     private IReadOnlyList<RegisteredSolution> Solutions { get; set; } = Array.Empty<RegisteredSolution>();
 
+    [Parameter]
+    public Guid? RegisteredSolutionId { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadSolutionsAsync();
@@ -198,7 +184,9 @@
             IsLoadingSolutions = true;
             LoadError = null;
             Solutions = await RegisteredSolutionService.GetAllAsync();
-            SelectedSolution = Solutions.FirstOrDefault(solution => solution.Status == RegisteredSolutionStatus.Valid);
+            SelectedSolution = RegisteredSolutionId is Guid routeSolutionId
+                ? Solutions.SingleOrDefault(solution => solution.Id == routeSolutionId)
+                : Solutions.FirstOrDefault(solution => solution.Status == RegisteredSolutionStatus.Valid);
         }
         catch (Exception ex)
         {
@@ -218,18 +206,10 @@
         }
     }
 
-    private async Task SelectSolutionAsync(Guid solutionId)
+    private async Task SelectSolutionAsync(RegisteredSolution solution)
     {
-        SelectedSolution = Solutions.SingleOrDefault(solution => solution.Id == solutionId);
-        RunError = null;
-
-        if (SelectedSolution is null)
-        {
-            LatestRun = null;
-            return;
-        }
-
-        await LoadLatestRunAsync(SelectedSolution.Id);
+        SelectedSolution = solution;
+        await LoadLatestRunAsync(solution.Id);
     }
 
     private async Task LoadLatestRunAsync(Guid solutionId)

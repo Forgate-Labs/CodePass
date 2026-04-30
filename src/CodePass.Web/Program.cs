@@ -1,5 +1,6 @@
 using CodePass.Web.Components;
 using CodePass.Web.Data;
+using CodePass.Web.Services.AgentAnalysis;
 using CodePass.Web.Services.CoverageAnalysis;
 using CodePass.Web.Services.Dashboard;
 using CodePass.Web.Services.RuleAnalysis;
@@ -27,7 +28,9 @@ builder.Services.AddScoped<IRuleAnalysisRunService, RuleAnalysisRunService>();
 builder.Services.AddScoped<ICoverageAnalyzer, DotNetCoverageAnalyzer>();
 builder.Services.AddScoped<ICoverageAnalysisResultService, CoverageAnalysisResultService>();
 builder.Services.AddScoped<ICoverageAnalysisRunService, CoverageAnalysisRunService>();
+builder.Services.AddScoped<IQualityScoreSettingsService, QualityScoreSettingsService>();
 builder.Services.AddScoped<IQualityScoreService, QualityScoreService>();
+builder.Services.AddScoped<IAgentQualityAnalysisService, AgentQualityAnalysisService>();
 builder.Services.AddHostedService<SolutionStatusRefreshService>();
 
 var app = builder.Build();
@@ -47,6 +50,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapStaticAssets();
+app.MapAgentQualityAnalysisEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

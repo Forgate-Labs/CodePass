@@ -5,6 +5,7 @@ using CodePass.Web.Data.Entities;
 using CodePass.Web.Services.Dashboard;
 using CodePass.Web.Services.Solutions;
 using FluentAssertions;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -151,18 +152,20 @@ public sealed class DashboardPageTests : TestContext
     }
 
     [Fact]
-    public void NavMenu_ShouldExposeDashboardAndPreserveExistingReviewLinks()
+    public void NavMenu_ShouldExposeScoreWhenSolutionIsSelected()
     {
+        var solutionId = Guid.NewGuid();
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        navigationManager.NavigateTo($"/solutions/{solutionId}/analysis/rules");
+
         var cut = RenderComponent<NavMenu>();
 
         var links = cut.FindAll("a.nav-link");
-        links.Should().Contain(link => link.GetAttribute("href") == "/dashboard" && link.TextContent.Contains("Dashboard"));
-        links.Should().Contain(link => link.GetAttribute("href") == "/solutions" && link.TextContent.Contains("Registered Solutions"));
-        links.Should().Contain(link => link.GetAttribute("href") == "/rules" && link.TextContent.Contains("Authored Rules"));
-        links.Should().Contain(link => link.GetAttribute("href") == "/analysis/rules" && link.TextContent.Contains("Rule Analysis"));
-        links.Should().Contain(link => link.GetAttribute("href") == "/analysis/coverage" && link.TextContent.Contains("Coverage Analysis"));
+        links.Should().Contain(link => link.GetAttribute("href") == $"/solutions/{solutionId}/dashboard" && link.TextContent.Contains("Score"));
+        links.Should().Contain(link => link.GetAttribute("href") == $"/solutions/{solutionId}/analysis/rules" && link.TextContent.Contains("Rule Analysis"));
+        links.Should().Contain(link => link.GetAttribute("href") == $"/solutions/{solutionId}/analysis/coverage" && link.TextContent.Contains("Coverage Analysis"));
 
-        links.Select(link => link.GetAttribute("href")).Take(2).Should().Equal("/dashboard", "/solutions");
+        links.Select(link => link.GetAttribute("href")).Should().StartWith($"/solutions/{solutionId}/dashboard");
     }
 }
 

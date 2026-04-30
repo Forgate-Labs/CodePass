@@ -20,6 +20,10 @@ a, .btn-link {
     padding-top: 1.1rem;
 }
 
+.min-w-0 {
+    min-width: 0;
+}
+
 h1:focus {
     outline: none;
 }

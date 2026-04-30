@@ -101,7 +101,7 @@ public sealed class RuleAnalysisPageTests : TestContext
         {
             runService.StartCalls.Should().ContainSingle(id => id == solution.Id);
             cut.Markup.Should().Contain("Avoid Console.WriteLine");
-            cut.Markup.Should().Contain("Program.cs");
+            cut.Find("[data-testid='rule-violations-toggle']").TextContent.Should().Contain("View violations");
             cut.Find("[data-testid='run-total-violations']").TextContent.Should().Contain("1");
         });
     }
@@ -251,7 +251,8 @@ internal static class RuleAnalysisComponentTestData
         int startLine = 12,
         int startColumn = 9,
         int endLine = 12,
-        int endColumn = 27)
+        int endColumn = 27,
+        string message = "Avoid calling Console.WriteLine directly.")
         => new(
             Guid.NewGuid(),
             Guid.NewGuid(),
@@ -259,7 +260,7 @@ internal static class RuleAnalysisComponentTestData
             "Avoid Console.WriteLine",
             "forbidden_api_usage",
             severity,
-            "Avoid calling Console.WriteLine directly.",
+            message,
             filePath,
             startLine,
             startColumn,

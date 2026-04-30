@@ -19,6 +19,8 @@ public sealed class RegisteredSolution
 
     public DateTimeOffset? LastValidatedAtUtc { get; set; }
 
+    public double QualityScorePassThreshold { get; set; } = 80;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }

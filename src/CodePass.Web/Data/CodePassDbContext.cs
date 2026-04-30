@@ -22,6 +22,7 @@ public sealed class CodePassDbContext(DbContextOptions<CodePassDbContext> option
         registeredSolution.Property(solution => solution.DisplayName).IsRequired();
         registeredSolution.Property(solution => solution.SolutionPath).IsRequired();
         registeredSolution.Property(solution => solution.Status).HasConversion<string>().IsRequired();
+        registeredSolution.Property(solution => solution.QualityScorePassThreshold).IsRequired().HasDefaultValue(80);
         registeredSolution.HasIndex(solution => solution.DisplayName);
         registeredSolution.HasIndex(solution => solution.SolutionPath).IsUnique();
 

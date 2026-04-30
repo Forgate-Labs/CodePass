@@ -6,10 +6,15 @@ namespace CodePass.Web.Services.Dashboard;
 
 public sealed class QualityScoreService(
     IRuleAnalysisResultService ruleAnalysisResultService,
-    ICoverageAnalysisResultService coverageAnalysisResultService) : IQualityScoreService
+    ICoverageAnalysisResultService coverageAnalysisResultService,
+    IQualityScoreSettingsService? scoreSettingsService = null) : IQualityScoreService
 {
     private const double RuleMaxPoints = 100;
     private const double CoverageMaxPoints = 100;
+    private const double ErrorViolationWeight = 5;
+    private const double WarningViolationWeight = 2;
+    private const double InfoViolationWeight = 0.5;
+    private const double MinimumEffectiveRuleLineCount = 1000;
 
     public async Task<QualityScoreSnapshotDto> GetCurrentSnapshotAsync(
         Guid registeredSolutionId,
@@ -17,12 +22,15 @@ public sealed class QualityScoreService(
     {
         var ruleRun = await ruleAnalysisResultService.GetLatestRunForSolutionAsync(registeredSolutionId, cancellationToken);
         var coverageRun = await coverageAnalysisResultService.GetLatestRunForSolutionAsync(registeredSolutionId, cancellationToken);
+        var passThreshold = scoreSettingsService is null
+            ? QualityScoreSettingsService.DefaultPassThreshold
+            : (await scoreSettingsService.GetSettingsAsync(registeredSolutionId, cancellationToken)).PassThreshold;
 
         var ruleContribution = BuildRuleContribution(ruleRun, coverageRun?.TotalLineCount);
         var coverageContribution = BuildCoverageContribution(coverageRun);
         var score = RoundPoints((ruleContribution.EarnedPoints + coverageContribution.EarnedPoints) / 2);
         var blockingReasons = ruleContribution.BlockingReasons.Concat(coverageContribution.BlockingReasons).ToList();
-        var status = IsPassingSnapshot(score, ruleRun, coverageRun, ruleContribution)
+        var status = IsPassingSnapshot(score, passThreshold, ruleRun, coverageRun, ruleContribution)
             ? QualityScoreStatus.Pass
             : QualityScoreStatus.Fail;
 
@@ -84,12 +92,12 @@ public sealed class QualityScoreService(
 
         var scoringLineCount = totalLineCount.GetValueOrDefault();
         var incorrectLineCount = CountViolationLines(run);
-        var warningLineCount = CountWarningOnlyViolationLines(run);
         var earnedPoints = CalculateRuleScore(
             scoringLineCount,
             incorrectLineCount,
-            warningLineCount,
-            totalViolations);
+            errorCount,
+            warningCount,
+            infoCount);
         var summary = totalViolations == 0
             ? "Rule-analysis evidence succeeded with no violations."
             : scoringLineCount > 0
@@ -165,11 +173,12 @@ public sealed class QualityScoreService(
 
     private static bool IsPassingSnapshot(
         double score,
+        double passThreshold,
         RuleAnalysisRunDto? ruleRun,
         CoverageAnalysisRunDto? coverageRun,
         QualityRuleContributionDto ruleContribution)
     {
-        return score >= 80
+        return score >= passThreshold
             && ruleRun?.Status == RuleAnalysisRunStatus.Succeeded
             && coverageRun?.Status == CoverageAnalysisRunStatus.Succeeded
             && ruleContribution.ErrorCount == 0;
@@ -191,35 +200,47 @@ public sealed class QualityScoreService(
             .Count();
     }
 
-    private static int CountWarningOnlyViolationLines(RuleAnalysisRunDto run)
-    {
-        return run.RuleGroups
-            .SelectMany(group => group.Violations.Select(violation => new
-            {
-                violation.FilePath,
-                violation.StartLine,
-                group.Severity
-            }))
-            .GroupBy(violation => new { violation.FilePath, violation.StartLine })
-            .Count(group => group.All(violation => violation.Severity == RuleSeverity.Warning));
-    }
-
     private static double CalculateRuleScore(
         int totalLineCount,
         int incorrectLineCount,
-        int warningLineCount,
-        int totalViolations)
+        int errorCount,
+        int warningCount,
+        int infoCount)
     {
-        if (totalLineCount <= 0)
+        var totalViolations = errorCount + warningCount + infoCount;
+        if (totalViolations == 0)
         {
-            return totalViolations == 0 ? RuleMaxPoints : 0;
+            return RuleMaxPoints;
         }
 
-        var normalizedIncorrectLineCount = Math.Min(incorrectLineCount, totalLineCount);
-        var normalizedWarningLineCount = Math.Min(warningLineCount, normalizedIncorrectLineCount);
-        var correctLineCount = totalLineCount - normalizedIncorrectLineCount;
-        var penalizedIncorrectLineCount = normalizedIncorrectLineCount - normalizedWarningLineCount;
-        var score = (correctLineCount - penalizedIncorrectLineCount) / (double)totalLineCount * RuleMaxPoints;
+        var weightedViolationPoints = (errorCount * ErrorViolationWeight)
+            + (warningCount * WarningViolationWeight)
+            + (infoCount * InfoViolationWeight);
+        var effectiveLineCount = totalLineCount > 0
+            ? Math.Max(totalLineCount, MinimumEffectiveRuleLineCount)
+            : MinimumEffectiveRuleLineCount;
+        var normalizedIncorrectLineCount = totalLineCount > 0
+            ? Math.Min(incorrectLineCount, totalLineCount)
+            : incorrectLineCount;
+
+        var densityPenalty = weightedViolationPoints / effectiveLineCount * 1000;
+        var affectedLinePenalty = normalizedIncorrectLineCount / (double)effectiveLineCount * 100;
+        var volumePenalty = Math.Log2(1 + weightedViolationPoints) * 3;
+        var penalty = Math.Max(Math.Max(densityPenalty, affectedLinePenalty), volumePenalty);
+        var score = RuleMaxPoints - penalty;
+
+        if (errorCount > 0)
+        {
+            score = Math.Min(score, 89);
+        }
+        else if (warningCount > 0)
+        {
+            score = Math.Min(score, 95);
+        }
+        else if (infoCount > 0)
+        {
+            score = Math.Min(score, 98);
+        }
 
         return RoundPoints(Clamp(score, min: 0, max: RuleMaxPoints));
     }

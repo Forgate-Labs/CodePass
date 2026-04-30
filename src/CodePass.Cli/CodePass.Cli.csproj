@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>codepass</ToolCommandName>
+    <PackageId>CodePass.Tool</PackageId>
+    <Version>0.1.0</Version>
+    <Title>CodePass CLI</Title>
+    <Description>CLI headless para executar análises de regras e cobertura do CodePass.</Description>
+    <Authors>CodePass</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/efacunha/CodePass</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodePass.Web\CodePass.Web.csproj" />
+  </ItemGroup>
+
+</Project>

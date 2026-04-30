@@ -40,7 +40,7 @@
 
             @if (Run.Status == RuleAnalysisRunStatus.Failed && !string.IsNullOrWhiteSpace(Run.ErrorMessage))
             {
-                <div class="alert alert-danger" role="alert" data-testid="run-error-message">
+                <div class="alert alert-danger text-break" role="alert" data-testid="run-error-message">
                     @Run.ErrorMessage
                 </div>
             }
@@ -54,47 +54,69 @@
             @if (Run.RuleGroups.Count > 0)
             {
                 <div class="d-flex flex-column gap-3" data-testid="rule-result-groups">
-                    @foreach (var group in Run.RuleGroups)
+                    @for (var groupIndex = 0; groupIndex < Run.RuleGroups.Count; groupIndex++)
                     {
+                        var group = Run.RuleGroups[groupIndex];
+                        var capturedGroupIndex = groupIndex;
+                        var isExpanded = _expandedRuleGroupIndex == groupIndex;
+
                         <article class="card border" data-testid="rule-result-group">
                             <div class="card-header bg-transparent">
                                 <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
-                                    <div>
+                                    <div class="min-w-0">
                                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                            <span class="text-body-secondary small text-uppercase fw-semibold" data-testid="result-rule-code">@group.RuleCode</span>
+                                            <span class="text-body-secondary small text-uppercase fw-semibold text-break" data-testid="result-rule-code">@group.RuleCode</span>
                                             <span class="badge @GetSeverityBadgeClass(group.Severity)" data-testid="result-rule-severity">@group.Severity</span>
                                             <span class="badge text-bg-light" data-testid="result-rule-kind">@group.RuleKind</span>
                                         </div>
-                                        <h3 class="h5 mb-0" data-testid="result-rule-title">@group.RuleTitle</h3>
+                                        <h3 class="h5 mb-1 text-break" data-testid="result-rule-title">@group.RuleTitle</h3>
+                                        @if (!isExpanded)
+                                        {
+                                            <p class="small text-body-secondary mb-0" data-testid="violations-hidden-message">
+                                                Violations are hidden. View violations to inspect this rule.
+                                            </p>
+                                        }
                                     </div>
 
-                                    <span class="badge text-bg-secondary" data-testid="result-violation-count">@group.ViolationCount violation@(group.ViolationCount == 1 ? string.Empty : "s")</span>
+                                    <div class="d-flex flex-wrap align-items-center justify-content-lg-end gap-2 flex-shrink-0">
+                                        <span class="badge text-bg-secondary" data-testid="result-violation-count">@group.ViolationCount violation@(group.ViolationCount == 1 ? string.Empty : "s")</span>
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm"
+                                                data-testid="rule-violations-toggle"
+                                                @onclick="() => ToggleRuleGroup(capturedGroupIndex)">
+                                            @(isExpanded ? "Hide violations" : "View violations")
+                                            <span class="badge text-bg-secondary ms-2" data-testid="rule-violations-count">@group.ViolationCount</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="list-group list-group-flush">
-                                @foreach (var violation in group.Violations)
-                                {
-                                    <div class="list-group-item" data-testid="violation-row">
-                                        <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
-                                            <div>
-                                                <p class="fw-semibold mb-1" data-testid="violation-message">@violation.Message</p>
-                                                <p class="text-body-secondary small mb-0" data-testid="violation-file-path">@violation.FilePath</p>
-                                            </div>
-                                            <div class="text-lg-end small">
-                                                <div>
-                                                    <span class="badge @GetSeverityBadgeClass(violation.Severity)" data-testid="violation-severity">@violation.Severity</span>
+                            @if (isExpanded)
+                            {
+                                <div class="list-group list-group-flush" data-testid="rule-violations-list">
+                                    @foreach (var violation in group.Violations)
+                                    {
+                                        <div class="list-group-item" data-testid="violation-row">
+                                            <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
+                                                <div class="min-w-0">
+                                                    <p class="fw-semibold mb-1 text-break" data-testid="violation-message">@violation.Message</p>
+                                                    <p class="text-body-secondary small mb-0 text-break" data-testid="violation-file-path">@violation.FilePath</p>
                                                 </div>
-                                                <div class="text-body-secondary mt-2" data-testid="violation-start-location">@violation.StartLine:@violation.StartColumn</div>
-                                                @if (HasEndLocation(violation))
-                                                {
-                                                    <div class="text-body-secondary" data-testid="violation-end-location">Ends @violation.EndLine:@violation.EndColumn</div>
-                                                }
+                                                <div class="text-lg-end small flex-shrink-0">
+                                                    <div>
+                                                        <span class="badge @GetSeverityBadgeClass(violation.Severity)" data-testid="violation-severity">@violation.Severity</span>
+                                                    </div>
+                                                    <div class="text-body-secondary mt-2" data-testid="violation-start-location">@violation.StartLine:@violation.StartColumn</div>
+                                                    @if (HasEndLocation(violation))
+                                                    {
+                                                        <div class="text-body-secondary" data-testid="violation-end-location">Ends @violation.EndLine:@violation.EndColumn</div>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                }
-                            </div>
+                                    }
+                                </div>
+                            }
                         </article>
                     }
                 </div>
@@ -104,8 +126,31 @@
 </section>
 
 @code {
+    private int? _expandedRuleGroupIndex;
+    private Guid? _lastRunId;
+
     [Parameter]
     public RuleAnalysisRunDto? Run { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        var runId = Run?.Id;
+        if (_lastRunId != runId)
+        {
+            _lastRunId = runId;
+            _expandedRuleGroupIndex = null;
+        }
+
+        if (_expandedRuleGroupIndex is int expandedGroupIndex && (Run is null || expandedGroupIndex >= Run.RuleGroups.Count))
+        {
+            _expandedRuleGroupIndex = null;
+        }
+    }
+
+    private void ToggleRuleGroup(int groupIndex)
+    {
+        _expandedRuleGroupIndex = _expandedRuleGroupIndex == groupIndex ? null : groupIndex;
+    }
 
     private static string FormatDateTime(DateTimeOffset dateTime)
         => dateTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm");

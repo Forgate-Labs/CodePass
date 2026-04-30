@@ -48,9 +48,9 @@ public sealed class QualityScoreServiceTests
 
         var snapshot = await service.GetCurrentSnapshotAsync(registeredSolutionId);
 
-        snapshot.Score.Should().Be(88.5);
+        snapshot.Score.Should().Be(84.5);
         snapshot.Status.Should().Be(QualityScoreStatus.Fail);
-        snapshot.RuleContribution.EarnedPoints.Should().Be(97);
+        snapshot.RuleContribution.EarnedPoints.Should().Be(89);
         snapshot.RuleContribution.ErrorCount.Should().Be(1);
         snapshot.RuleContribution.WarningCount.Should().Be(1);
         snapshot.RuleContribution.InfoCount.Should().Be(0);
@@ -58,6 +58,41 @@ public sealed class QualityScoreServiceTests
         snapshot.CoverageContribution.EarnedPoints.Should().Be(80);
         snapshot.CoverageContribution.LineCoveragePercent.Should().Be(80);
         snapshot.BlockingReasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetCurrentSnapshotAsync_ShouldPenalizeManyErrorsEvenInLargeCodebases()
+    {
+        var registeredSolutionId = Guid.NewGuid();
+        var service = CreateService(
+            RuleRun(
+                registeredSolutionId,
+                RuleAnalysisRunStatus.Succeeded,
+                [RuleGroup(RuleSeverity.Error, violationCount: 22)]),
+            CoverageRun(registeredSolutionId, CoverageAnalysisRunStatus.Succeeded, lineCoveragePercent: 100, coveredLines: 10000, totalLines: 10000));
+
+        var snapshot = await service.GetCurrentSnapshotAsync(registeredSolutionId);
+
+        snapshot.Score.Should().Be(89.8);
+        snapshot.Status.Should().Be(QualityScoreStatus.Fail);
+        snapshot.RuleContribution.EarnedPoints.Should().Be(79.6);
+        snapshot.RuleContribution.ErrorCount.Should().Be(22);
+        snapshot.CoverageContribution.EarnedPoints.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task GetCurrentSnapshotAsync_ShouldUseSolutionPassThreshold()
+    {
+        var registeredSolutionId = Guid.NewGuid();
+        var service = CreateService(
+            RuleRun(registeredSolutionId, RuleAnalysisRunStatus.Succeeded, []),
+            CoverageRun(registeredSolutionId, CoverageAnalysisRunStatus.Succeeded, lineCoveragePercent: 78, coveredLines: 78, totalLines: 100),
+            passThreshold: 75);
+
+        var snapshot = await service.GetCurrentSnapshotAsync(registeredSolutionId);
+
+        snapshot.Score.Should().Be(89);
+        snapshot.Status.Should().Be(QualityScoreStatus.Pass);
     }
 
     [Fact]
@@ -88,11 +123,13 @@ public sealed class QualityScoreServiceTests
 
     private static IQualityScoreService CreateService(
         RuleAnalysisRunDto? ruleRun,
-        CoverageAnalysisRunDto? coverageRun)
+        CoverageAnalysisRunDto? coverageRun,
+        double? passThreshold = null)
     {
         return new QualityScoreService(
             new FakeRuleAnalysisResultService(ruleRun),
-            new FakeCoverageAnalysisResultService(coverageRun));
+            new FakeCoverageAnalysisResultService(coverageRun),
+            passThreshold is null ? null : new FakeQualityScoreSettingsService(passThreshold.Value));
     }
 
     private static RuleAnalysisRunDto RuleRun(
@@ -165,6 +202,15 @@ public sealed class QualityScoreServiceTests
             ErrorMessage: errorMessage,
             ProjectSummaries: [],
             ClassCoverages: []);
+    }
+
+    private sealed class FakeQualityScoreSettingsService(double passThreshold) : IQualityScoreSettingsService
+    {
+        public Task<QualityScoreSettingsDto> GetSettingsAsync(Guid registeredSolutionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new QualityScoreSettingsDto(registeredSolutionId, passThreshold));
+
+        public Task<QualityScoreSettingsDto> UpdateSettingsAsync(Guid registeredSolutionId, UpdateQualityScoreSettingsRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FakeRuleAnalysisResultService(RuleAnalysisRunDto? latestRun) : IRuleAnalysisResultService
