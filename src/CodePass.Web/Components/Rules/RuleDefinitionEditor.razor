@@ -21,41 +21,86 @@
                 </div>
 
                 <div class="modal-body d-flex flex-column gap-4">
-                        @if (!string.IsNullOrWhiteSpace(LoadError))
-                        {
-                            <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-load-error">@LoadError</div>
-                        }
+                    @if (!string.IsNullOrWhiteSpace(LoadError))
+                    {
+                        <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-load-error">@LoadError</div>
+                    }
 
-                        @if (!string.IsNullOrWhiteSpace(SubmissionError))
-                        {
-                            <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-submission-error">@SubmissionError</div>
-                        }
+                    @if (!string.IsNullOrWhiteSpace(SubmissionError))
+                    {
+                        <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-submission-error">@SubmissionError</div>
+                    }
 
-                        <section class="d-flex flex-column gap-3">
+                    <section class="d-flex flex-column gap-3" data-testid="authoring-mode-section">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+                            <div>
+                                <h3 class="h5 mb-1">Authoring mode</h3>
+                                <p class="text-body-secondary mb-0">Choose whether to use guided schema fields or write the full raw JSON DSL document.</p>
+                            </div>
+                            <div class="btn-group" role="group" aria-label="Authoring mode" data-testid="rule-editor-mode-toggle">
+                                <button type="button"
+                                        class="btn @(IsJsonMode ? "btn-outline-secondary" : "btn-primary")"
+                                        @onclick="SwitchToSchemaModeAsync"
+                                        data-testid="schema-mode-button">
+                                    Schema fields
+                                </button>
+                                <button type="button"
+                                        class="btn @(IsJsonMode ? "btn-primary" : "btn-outline-secondary")"
+                                        @onclick="SwitchToJsonModeAsync"
+                                        data-testid="json-mode-button">
+                                    Raw JSON
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    @if (!string.IsNullOrWhiteSpace(JsonModeError))
+                    {
+                        <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-json-error">@JsonModeError</div>
+                    }
+
+                    @if (IsJsonMode)
+                    {
+                        <section class="border rounded p-3" data-testid="json-editor-section">
+                            <label class="form-label fw-semibold" for="rule-raw-json">Raw JSON</label>
+                            <textarea id="rule-raw-json"
+                                      class="form-control font-monospace"
+                                      rows="20"
+                                      wrap="off"
+                                      spellcheck="false"
+                                      value="@RawDefinitionJson"
+                                      @onchange="HandleRawJsonChanged"
+                                      data-testid="rule-raw-json-input"></textarea>
+                            <div class="form-text">Edit the full authored DSL document, including metadata, scope, and parameters. Line wrapping is disabled so pasted hard line breaks inside strings are visible.</div>
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="d-flex flex-column gap-3" data-testid="metadata-editor-section">
                             <div>
                                 <h3 class="h5 mb-1">Rule metadata</h3>
-                                <p class="text-body-secondary mb-0">These values become the stable authored DSL metadata stored by CodePass. Raw JSON mode edits the same full DSL document.</p>
+                                <p class="text-body-secondary mb-0">These values become the stable authored DSL metadata stored by CodePass.</p>
                             </div>
 
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label" for="rule-code">Rule code</label>
-                                    <InputText id="rule-code" class="form-control" @bind-Value="Model.Code" data-testid="rule-code-input" disabled="@IsJsonMode" />
+                                    <InputText id="rule-code" class="form-control" @bind-Value="Model.Code" data-testid="rule-code-input" />
                                     <ValidationMessage For="() => Model.Code" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="rule-title">Title</label>
-                                    <InputText id="rule-title" class="form-control" @bind-Value="Model.Title" data-testid="rule-title-input" disabled="@IsJsonMode" />
+                                    <InputText id="rule-title" class="form-control" @bind-Value="Model.Title" data-testid="rule-title-input" />
                                     <ValidationMessage For="() => Model.Title" />
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label" for="rule-description">Description</label>
-                                    <InputTextArea id="rule-description" class="form-control" rows="3" @bind-Value="Model.Description" data-testid="rule-description-input" disabled="@IsJsonMode" />
+                                    <InputTextArea id="rule-description" class="form-control" rows="3" @bind-Value="Model.Description" data-testid="rule-description-input" />
                                     <ValidationMessage For="() => Model.Description" />
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="rule-severity">Severity</label>
-                                    <InputSelect id="rule-severity" class="form-select" @bind-Value="Model.Severity" data-testid="rule-severity-input" disabled="@IsJsonMode">
+                                    <InputSelect id="rule-severity" class="form-select" @bind-Value="Model.Severity" data-testid="rule-severity-input">
                                         @foreach (var severity in Enum.GetValues<RuleSeverity>())
                                         {
                                             <option value="@severity">@severity</option>
@@ -64,7 +109,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="rule-kind">Rule kind</label>
-                                    <InputSelect id="rule-kind" class="form-select" @bind-Value="Model.RuleKind" @bind-Value:after="HandleRuleKindChangedAsync" data-testid="rule-kind-select" disabled="@IsJsonMode">
+                                    <InputSelect id="rule-kind" class="form-select" @bind-Value="Model.RuleKind" @bind-Value:after="HandleRuleKindChangedAsync" data-testid="rule-kind-select">
                                         <option value="">Select a rule kind</option>
                                         @foreach (var ruleKind in RuleKinds)
                                         {
@@ -75,7 +120,7 @@
                                 </div>
                                 <div class="col-md-4 d-flex align-items-end">
                                     <div class="form-check mb-2">
-                                        <InputCheckbox id="rule-enabled" class="form-check-input" @bind-Value="Model.IsEnabled" data-testid="rule-enabled-input" disabled="@IsJsonMode" />
+                                        <InputCheckbox id="rule-enabled" class="form-check-input" @bind-Value="Model.IsEnabled" data-testid="rule-enabled-input" />
                                         <label class="form-check-label" for="rule-enabled">Enabled</label>
                                     </div>
                                 </div>
@@ -84,87 +129,44 @@
 
                         @if (SelectedRuleKind is not null)
                         {
-                            <section class="d-flex flex-column gap-3">
-                                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
-                                    <div>
-                                        <h3 class="h5 mb-1">Authoring mode</h3>
-                                        <p class="text-body-secondary mb-0">Switch between the schema-driven editor and the full raw JSON DSL document for <strong>@SelectedRuleKind.Title</strong>.</p>
-                                    </div>
-                                    <div class="btn-group" role="group" aria-label="Authoring mode" data-testid="rule-editor-mode-toggle">
-                                        <button type="button"
-                                                class="btn @(IsJsonMode ? "btn-outline-secondary" : "btn-primary")"
-                                                @onclick="SwitchToSchemaModeAsync"
-                                                data-testid="schema-mode-button">
-                                            Schema fields
-                                        </button>
-                                        <button type="button"
-                                                class="btn @(IsJsonMode ? "btn-primary" : "btn-outline-secondary")"
-                                                @onclick="SwitchToJsonModeAsync"
-                                                data-testid="json-mode-button">
-                                            Raw JSON
-                                        </button>
-                                    </div>
+                            <section class="d-flex flex-column gap-3" data-testid="dynamic-schema-section">
+                                <div>
+                                    <h3 class="h5 mb-1">Schema-driven fields</h3>
+                                    <p class="text-body-secondary mb-0">Fill the generated scope and parameter fields for <strong>@SelectedRuleKind.Title</strong>. Defaults come from the supported rule kind metadata.</p>
                                 </div>
 
-                                @if (!string.IsNullOrWhiteSpace(JsonModeError))
-                                {
-                                    <div class="alert alert-danger mb-0" role="alert" data-testid="rule-editor-json-error">@JsonModeError</div>
-                                }
-
-                                @if (IsJsonMode)
-                                {
-                                    <div class="border rounded p-3" data-testid="json-editor-section">
-                                        <label class="form-label fw-semibold" for="rule-raw-json">Raw JSON</label>
-                                        <textarea id="rule-raw-json"
-                                                  class="form-control font-monospace"
-                                                  rows="20"
-                                                  value="@RawDefinitionJson"
-                                                  @onchange="HandleRawJsonChanged"
-                                                  data-testid="rule-raw-json-input"></textarea>
-                                        <div class="form-text">Edit the full authored DSL document, including metadata, scope, and parameters. Save stays backed by server-side validation.</div>
+                                <div class="row g-4">
+                                    <div class="col-12 col-lg-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <h4 class="h6 mb-3">Scope</h4>
+                                            <div class="d-flex flex-column gap-3">
+                                                @foreach (var field in SelectedRuleKind.ScopeFields)
+                                                {
+                                                    <SchemaFieldEditor Definition="field"
+                                                                       Value="GetScopeValue(field.Name)"
+                                                                       ValueChanged="value => HandleScopeValueChanged(field.Name, value)" />
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
-                                }
-                                else
-                                {
-                                    <section class="d-flex flex-column gap-3" data-testid="dynamic-schema-section">
-                                        <div>
-                                            <h3 class="h5 mb-1">Schema-driven fields</h3>
-                                            <p class="text-body-secondary mb-0">Fill the generated scope and parameter fields for <strong>@SelectedRuleKind.Title</strong>. Defaults come from the supported rule kind metadata.</p>
-                                        </div>
-
-                                        <div class="row g-4">
-                                            <div class="col-12 col-lg-6">
-                                                <div class="border rounded p-3 h-100">
-                                                    <h4 class="h6 mb-3">Scope</h4>
-                                                    <div class="d-flex flex-column gap-3">
-                                                        @foreach (var field in SelectedRuleKind.ScopeFields)
-                                                        {
-                                                            <SchemaFieldEditor Definition="field"
-                                                                               Value="GetScopeValue(field.Name)"
-                                                                               ValueChanged="value => HandleScopeValueChanged(field.Name, value)" />
-                                                        }
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-lg-6">
-                                                <div class="border rounded p-3 h-100">
-                                                    <h4 class="h6 mb-3">Parameters</h4>
-                                                    <div class="d-flex flex-column gap-3">
-                                                        @foreach (var field in SelectedRuleKind.ParameterFields)
-                                                        {
-                                                            <SchemaFieldEditor Definition="field"
-                                                                               Value="GetParameterValue(field.Name)"
-                                                                               ValueChanged="value => HandleParameterValueChanged(field.Name, value)" />
-                                                        }
-                                                    </div>
-                                                </div>
+                                    <div class="col-12 col-lg-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <h4 class="h6 mb-3">Parameters</h4>
+                                            <div class="d-flex flex-column gap-3">
+                                                @foreach (var field in SelectedRuleKind.ParameterFields)
+                                                {
+                                                    <SchemaFieldEditor Definition="field"
+                                                                       Value="GetParameterValue(field.Name)"
+                                                                       ValueChanged="value => HandleParameterValueChanged(field.Name, value)" />
+                                                }
                                             </div>
                                         </div>
-                                    </section>
-                                }
+                                    </div>
+                                </div>
                             </section>
                         }
-                    </div>
+                    }
+                </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-outline-secondary" type="button" @onclick="CloseAsync" disabled="@IsSubmitting">Cancel</button>
@@ -192,6 +194,7 @@
     private bool IsCatalogLoading { get; set; }
     private bool IsSubmitting { get; set; }
     private bool IsJsonMode { get; set; }
+    private bool IsRawJsonDirty { get; set; }
     private bool IsEditMode => Rule is not null;
     private bool IsSaveDisabled => IsSubmitting || (IsCatalogLoading && SelectedRuleKind is null);
 
@@ -250,6 +253,7 @@
         SubmissionError = null;
         JsonModeError = null;
         IsJsonMode = false;
+        IsRawJsonDirty = false;
         ScopeValues.Clear();
         ParameterValues.Clear();
 
@@ -302,6 +306,7 @@
         JsonModeError = null;
         RawDefinitionJson = SerializeFullDefinition();
         IsJsonMode = true;
+        IsRawJsonDirty = false;
         return Task.CompletedTask;
     }
 
@@ -313,6 +318,15 @@
             return Task.CompletedTask;
         }
 
+        if (!IsRawJsonDirty)
+        {
+            JsonModeError = null;
+            IsJsonMode = false;
+            RawDefinitionJson = SelectedRuleKind is null ? string.Empty : SerializeFullDefinition();
+            EditContext.NotifyValidationStateChanged();
+            return Task.CompletedTask;
+        }
+
         if (!TryApplyRawJsonToForm(RawDefinitionJson, out var errorMessage))
         {
             JsonModeError = errorMessage;
@@ -321,6 +335,7 @@
 
         JsonModeError = null;
         IsJsonMode = false;
+        IsRawJsonDirty = false;
         RawDefinitionJson = SerializeFullDefinition();
         EditContext.NotifyValidationStateChanged();
         return Task.CompletedTask;
@@ -331,6 +346,7 @@
         SubmissionError = null;
         JsonModeError = null;
         RawDefinitionJson = args.Value?.ToString() ?? string.Empty;
+        IsRawJsonDirty = true;
     }
 
     private async Task HandleSubmitAsync(EditContext editContext)
@@ -343,6 +359,11 @@
         {
             JsonModeError = jsonError;
             return;
+        }
+
+        if (IsJsonMode)
+        {
+            IsRawJsonDirty = false;
         }
 
         if (!editContext.Validate())
@@ -485,7 +506,6 @@
             ["schemaVersion"] = SelectedRuleKind?.SchemaVersion ?? string.Empty,
             ["severity"] = Model.Severity.ToString().ToLowerInvariant(),
             ["enabled"] = Model.IsEnabled,
-            ["language"] = "csharp",
             ["scope"] = JsonSerializer.Deserialize<JsonElement>(SerializeDictionary(ScopeValues)),
             ["parameters"] = JsonSerializer.Deserialize<JsonElement>(SerializeDictionary(ParameterValues))
         };
@@ -604,11 +624,23 @@
             errorMessage = null;
             return true;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            errorMessage = "Raw JSON must contain valid JSON.";
+            errorMessage = FormatJsonException("Raw JSON must contain valid JSON", ex);
             return false;
         }
+    }
+
+    private static string FormatJsonException(string message, JsonException exception)
+    {
+        var location = exception.LineNumber is long lineNumber && exception.BytePositionInLine is long bytePosition
+            ? $" at line {lineNumber + 1}, column {bytePosition + 1}"
+            : string.Empty;
+        var path = string.IsNullOrWhiteSpace(exception.Path)
+            ? string.Empty
+            : $" near '{exception.Path}'";
+
+        return $"{message}{location}{path}. {exception.Message}";
     }
 
     private static string? GetRequiredString(JsonElement document, string propertyName, out string? errorMessage)

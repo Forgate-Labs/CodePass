@@ -5,6 +5,7 @@ using CodePass.Web.Services.RuleAnalysis;
 using CodePass.Web.Services.Rules;
 using CodePass.Web.Services.Solutions;
 using FluentAssertions;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,6 +13,12 @@ namespace CodePass.Web.Tests.Components;
 
 public sealed class RuleAnalysisPageTests : TestContext
 {
+    public RuleAnalysisPageTests()
+    {
+        Services.AddSingleton<IRuleDefinitionService>(new FakeRuleDefinitionService());
+        Services.AddSingleton<IRuleCatalogService>(new FakeRuleCatalogService());
+    }
+
     [Fact]
     public void EmptyState_ShouldRenderWhenNoRegisteredSolutionsExist()
     {
@@ -76,6 +83,137 @@ public sealed class RuleAnalysisPageTests : TestContext
             selectionService.GetSelectionCalls.Should().Contain(beta.Id);
             cut.Markup.Should().Contain("Beta rule");
             cut.Markup.Should().NotContain("Alpha rule");
+        });
+    }
+
+    [Fact]
+    public async Task CreatingRuleFromAnalysisPage_ShouldOpenEditorAndRefreshSelectionsAfterSave()
+    {
+        var solution = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var selectionService = new RuleAnalysisTestSelectionService();
+        var ruleService = new FakeRuleDefinitionService();
+
+        Services.AddSingleton<IRegisteredSolutionService>(new RuleAnalysisTestRegisteredSolutionService(solution));
+        Services.AddSingleton<ISolutionRuleSelectionService>(selectionService);
+        Services.AddSingleton<IRuleAnalysisRunService>(new RuleAnalysisTestRunService());
+        Services.AddSingleton<IRuleAnalysisResultService>(new RuleAnalysisTestResultService());
+        Services.AddSingleton<IRuleDefinitionService>(ruleService);
+
+        var cut = RenderComponent<RuleAnalysis>();
+        cut.WaitForAssertion(() => cut.Find("[data-testid='create-analysis-rule-button']").TextContent.Should().Contain("New rule"));
+
+        await cut.Find("[data-testid='create-analysis-rule-button']").ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='rule-code-input']").ChangeAsync(new ChangeEventArgs { Value = "CP1000" });
+        await cut.Find("[data-testid='rule-title-input']").ChangeAsync(new ChangeEventArgs { Value = "Avoid var" });
+        await cut.Find("[data-testid='rule-kind-select']").ChangeAsync(new ChangeEventArgs { Value = "syntax_presence" });
+        await cut.Find("[data-testid='select-field-mode']").ChangeAsync(new ChangeEventArgs { Value = "forbid" });
+        await cut.Find("[data-testid='multi-select-field-targets']").ChangeAsync(new ChangeEventArgs { Value = new[] { "local_declaration" } });
+        await cut.Find("[data-testid='multi-select-field-syntaxKinds']").ChangeAsync(new ChangeEventArgs { Value = new[] { "var" } });
+        await cut.Find("form").SubmitAsync();
+
+        cut.WaitForAssertion(() =>
+        {
+            ruleService.CreateCalls.Should().Be(1);
+            selectionService.GetSelectionCalls.Count(call => call == solution.Id).Should().BeGreaterThanOrEqualTo(2);
+        });
+    }
+
+    [Fact]
+    public async Task EditingRuleFromAnalysisPage_ShouldOpenEditorWithSelectedRule()
+    {
+        var solution = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var ruleId = Guid.NewGuid();
+        var rule = FakeRuleDefinitionService.CreateRule(
+            code: "CP1000",
+            title: "Avoid Console.WriteLine",
+            kind: "forbidden_api_usage",
+            severity: RuleSeverity.Warning,
+            id: ruleId);
+        var selectionService = new RuleAnalysisTestSelectionService();
+        selectionService.SelectionsBySolution[solution.Id] =
+        [
+            RuleAnalysisComponentTestData.CreateSelection(
+                code: rule.Code,
+                title: rule.Title,
+                severity: rule.Severity,
+                kind: rule.RuleKind,
+                ruleId: ruleId)
+        ];
+
+        Services.AddSingleton<IRegisteredSolutionService>(new RuleAnalysisTestRegisteredSolutionService(solution));
+        Services.AddSingleton<ISolutionRuleSelectionService>(selectionService);
+        Services.AddSingleton<IRuleAnalysisRunService>(new RuleAnalysisTestRunService());
+        Services.AddSingleton<IRuleAnalysisResultService>(new RuleAnalysisTestResultService());
+        Services.AddSingleton<IRuleDefinitionService>(new FakeRuleDefinitionService(rule));
+
+        var cut = RenderComponent<RuleAnalysis>();
+        cut.WaitForAssertion(() => cut.Find("[data-testid='edit-analysis-rule-button']").TextContent.Should().Contain("Edit rule"));
+
+        await cut.Find("[data-testid='edit-analysis-rule-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Edit authored rule");
+            cut.Find("[data-testid='rule-title-input']").GetAttribute("value").Should().Be("Avoid Console.WriteLine");
+        });
+    }
+
+    [Fact]
+    public async Task DeletingRuleFromAnalysisPage_ShouldRequireConfirmationBeforeDeleting()
+    {
+        var solution = RuleAnalysisComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var ruleId = Guid.NewGuid();
+        var rule = FakeRuleDefinitionService.CreateRule(
+            code: "CP3000",
+            title: "Avoid goto",
+            kind: "syntax_presence",
+            severity: RuleSeverity.Error,
+            id: ruleId);
+        var ruleService = new FakeRuleDefinitionService(rule);
+        var selectionService = new RuleAnalysisTestSelectionService();
+        selectionService.SelectionsBySolution[solution.Id] =
+        [
+            RuleAnalysisComponentTestData.CreateSelection(
+                code: rule.Code,
+                title: rule.Title,
+                severity: rule.Severity,
+                kind: rule.RuleKind,
+                ruleId: ruleId)
+        ];
+
+        Services.AddSingleton<IRegisteredSolutionService>(new RuleAnalysisTestRegisteredSolutionService(solution));
+        Services.AddSingleton<ISolutionRuleSelectionService>(selectionService);
+        Services.AddSingleton<IRuleAnalysisRunService>(new RuleAnalysisTestRunService());
+        Services.AddSingleton<IRuleAnalysisResultService>(new RuleAnalysisTestResultService());
+        Services.AddSingleton<IRuleDefinitionService>(ruleService);
+
+        var cut = RenderComponent<RuleAnalysis>();
+        cut.WaitForAssertion(() => cut.Find("[data-testid='delete-analysis-rule-button']").TextContent.Should().Contain("Delete rule"));
+
+        await cut.Find("[data-testid='delete-analysis-rule-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Delete rule?");
+            cut.Markup.Should().Contain("Are you sure you want to delete");
+            ruleService.DeleteCalls.Should().Be(0);
+        });
+
+        await cut.Find("[data-testid='cancel-delete-rule-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().NotContain("Delete rule?");
+            ruleService.DeleteCalls.Should().Be(0);
+        });
+
+        await cut.Find("[data-testid='delete-analysis-rule-button']").ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='confirm-delete-rule-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            ruleService.DeletedIds.Should().ContainSingle(id => id == ruleId);
+            selectionService.GetSelectionCalls.Count(call => call == solution.Id).Should().BeGreaterThanOrEqualTo(2);
         });
     }
 

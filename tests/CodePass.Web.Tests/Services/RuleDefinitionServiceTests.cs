@@ -46,9 +46,76 @@ public sealed class RuleDefinitionServiceTests
         updated.RawDefinitionJson.Should().Contain("\"id\":\"CP0001\"");
         updated.RawDefinitionJson.Should().Contain("\"kind\":\"forbidden_api_usage\"");
         updated.RawDefinitionJson.Should().Contain("\"severity\":\"error\"");
+        updated.RawDefinitionJson.Should().NotContain("\"language\"");
 
         var persisted = await fixture.DbContext.AuthoredRuleDefinitions.SingleAsync();
         persisted.RawDefinitionJson.Should().Be(updated.RawDefinitionJson);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldAcceptRawJsonWithoutLanguageProperty()
+    {
+        await using var fixture = await RuleDefinitionServiceFixture.CreateAsync();
+
+        var rawJson = """
+            {
+              "id": "CP2001",
+              "title": "Limit cyclomatic complexity",
+              "description": "Methods should stay simple enough to review and test.",
+              "kind": "method_metrics",
+              "schemaVersion": "1.0",
+              "severity": "warning",
+              "enabled": true,
+              "scope": {
+                "projects": ["*"],
+                "files": ["**/*.cs"],
+                "excludeFiles": []
+              },
+              "parameters": {
+                "maxCyclomaticComplexity": 10
+              }
+            }
+            """;
+
+        var created = await fixture.Service.CreateAsync(new SaveAuthoredRuleDefinitionRequest(
+            Code: string.Empty,
+            Title: string.Empty,
+            Description: null,
+            RuleKind: string.Empty,
+            SchemaVersion: string.Empty,
+            Severity: RuleSeverity.Warning,
+            ScopeJson: "{}",
+            ParametersJson: "{}",
+            IsEnabled: true,
+            RawDefinitionJson: rawJson));
+
+        created.Code.Should().Be("CP2001");
+        created.RuleKind.Should().Be("method_metrics");
+        created.ParametersJson.Should().Be("{\"maxCyclomaticComplexity\":10}");
+        created.RawDefinitionJson.Should().NotContain("\"language\"");
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldReportRawJsonLineAndColumnWhenJsonIsInvalid()
+    {
+        await using var fixture = await RuleDefinitionServiceFixture.CreateAsync();
+
+        var act = async () => await fixture.Service.CreateAsync(new SaveAuthoredRuleDefinitionRequest(
+            Code: string.Empty,
+            Title: string.Empty,
+            Description: null,
+            RuleKind: string.Empty,
+            SchemaVersion: string.Empty,
+            Severity: RuleSeverity.Warning,
+            ScopeJson: "{}",
+            ParametersJson: "{}",
+            IsEnabled: true,
+            RawDefinitionJson: "{\n  invalid json\n}"));
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().Contain("valid JSON");
+        exception.Which.Message.Should().Contain("line");
+        exception.Which.Message.Should().Contain("column");
     }
 
     [Fact]

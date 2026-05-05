@@ -72,6 +72,29 @@ public sealed class DashboardPageTests : TestContext
     }
 
     [Fact]
+    public async Task SelectedSolution_ShouldBePreservedInAnalysisLinks()
+    {
+        var solution = DashboardComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);
+        var scoreService = new DashboardTestQualityScoreService();
+        scoreService.SnapshotsBySolution[solution.Id] = DashboardComponentTestData.CreateSnapshot(solution.Id, QualityScoreStatus.Pass, score: 95);
+
+        Services.AddSingleton<IRegisteredSolutionService>(new DashboardTestRegisteredSolutionService(solution));
+        Services.AddSingleton<IQualityScoreService>(scoreService);
+
+        var cut = RenderComponent<Dashboard>();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='rule-contribution-card'] a")
+                .GetAttribute("href")
+                .Should().Be($"/solutions/{solution.Id}/analysis/rules");
+            cut.Find("[data-testid='coverage-contribution-card'] a")
+                .GetAttribute("href")
+                .Should().Be($"/solutions/{solution.Id}/analysis/coverage");
+        });
+    }
+
+    [Fact]
     public async Task SelectingSolution_ShouldLoadCurrentSnapshotForSelectedSolution()
     {
         var alpha = DashboardComponentTestData.CreateSolution("Alpha", "/solutions/alpha.sln", RegisteredSolutionStatus.Valid);

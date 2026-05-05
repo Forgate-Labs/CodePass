@@ -67,7 +67,7 @@
                             </ul>
                         }
 
-                        <a class="btn btn-outline-primary btn-sm" href="/analysis/rules">Open rule analysis</a>
+                        <a class="btn btn-outline-primary btn-sm" href="@RuleAnalysisHref">Open rule analysis</a>
                     </div>
                 </article>
             </div>
@@ -116,7 +116,7 @@
                             </ul>
                         }
 
-                        <a class="btn btn-outline-primary btn-sm" href="/analysis/coverage">Open coverage analysis</a>
+                        <a class="btn btn-outline-primary btn-sm" href="@CoverageAnalysisHref">Open coverage analysis</a>
                     </div>
                 </article>
             </div>
@@ -127,6 +127,19 @@
 @code {
     [Parameter]
     public QualityScoreSnapshotDto? Snapshot { get; set; }
+
+    [Parameter]
+    public Guid? RegisteredSolutionId { get; set; }
+
+    private Guid? NavigationSolutionId => RegisteredSolutionId ?? Snapshot?.RegisteredSolutionId;
+
+    private string RuleAnalysisHref => NavigationSolutionId is Guid solutionId
+        ? $"/solutions/{solutionId}/analysis/rules"
+        : "/analysis/rules";
+
+    private string CoverageAnalysisHref => NavigationSolutionId is Guid solutionId
+        ? $"/solutions/{solutionId}/analysis/coverage"
+        : "/analysis/coverage";
 
     private static string FormatPoints(double value)
         => value.ToString("0.#");

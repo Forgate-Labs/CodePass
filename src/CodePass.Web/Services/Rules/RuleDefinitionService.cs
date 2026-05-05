@@ -158,12 +158,6 @@ public sealed class RuleDefinitionService(
         var schemaVersion = GetRequiredString(document, "schemaVersion");
         var severity = ParseSeverity(GetRequiredString(document, "severity"));
         var isEnabled = GetRequiredBoolean(document, "enabled");
-        var language = GetRequiredString(document, "language");
-
-        if (!string.Equals(language, "csharp", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Raw rule JSON must use language 'csharp'.");
-        }
 
         var ruleKind = await ruleCatalogService.GetRuleKindAsync(kind, cancellationToken)
             ?? throw new InvalidOperationException($"Rule kind '{kind}' is not supported.");
@@ -207,8 +201,20 @@ public sealed class RuleDefinitionService(
         }
         catch (JsonException ex)
         {
-            throw new InvalidOperationException($"{paramName} must contain valid JSON.", ex);
+            throw new InvalidOperationException(FormatJsonException($"{paramName} must contain valid JSON", ex), ex);
         }
+    }
+
+    private static string FormatJsonException(string message, JsonException exception)
+    {
+        var location = exception.LineNumber is long lineNumber && exception.BytePositionInLine is long bytePosition
+            ? $" at line {lineNumber + 1}, column {bytePosition + 1}"
+            : string.Empty;
+        var path = string.IsNullOrWhiteSpace(exception.Path)
+            ? string.Empty
+            : $" near '{exception.Path}'";
+
+        return $"{message}{location}{path}. {exception.Message}";
     }
 
     private static void ValidateFields(JsonElement document, IReadOnlyList<RuleCatalogFieldDefinition> fieldDefinitions, string sectionName)
@@ -362,7 +368,6 @@ public sealed class RuleDefinitionService(
             schemaVersion,
             severity = severity.ToString().ToLowerInvariant(),
             enabled = isEnabled,
-            language = "csharp",
             scope,
             parameters
         };

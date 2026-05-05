@@ -29,7 +29,7 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
         var ruleCard = cut.Find("[data-testid='rule-contribution-card']");
         ruleCard.TextContent.Should().Contain("Rule analysis contribution");
         ruleCard.TextContent.Should().Contain("Open rule analysis");
-        ruleCard.QuerySelector("a")!.GetAttribute("href").Should().Be("/analysis/rules");
+        ruleCard.QuerySelector("a")!.GetAttribute("href").Should().Be($"/solutions/{snapshot.RegisteredSolutionId}/analysis/rules");
 
         cut.Find("[data-testid='rule-contribution-points']").TextContent.Should().Be("70/100");
         cut.Find("[data-testid='rule-total-violations']").TextContent.Should().Be("6");
@@ -51,7 +51,7 @@ public sealed class QualityEvidenceBreakdownTests : TestContext
         var coverageCard = cut.Find("[data-testid='coverage-contribution-card']");
         coverageCard.TextContent.Should().Contain("Coverage contribution");
         coverageCard.TextContent.Should().Contain("Open coverage analysis");
-        coverageCard.QuerySelector("a")!.GetAttribute("href").Should().Be("/analysis/coverage");
+        coverageCard.QuerySelector("a")!.GetAttribute("href").Should().Be($"/solutions/{snapshot.RegisteredSolutionId}/analysis/coverage");
 
         cut.Find("[data-testid='coverage-contribution-points']").TextContent.Should().Be("83/100");
         cut.Find("[data-testid='coverage-line-percent']").TextContent.Should().Be("83.0%");

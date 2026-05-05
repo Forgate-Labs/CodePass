@@ -1,12 +1,15 @@
 @page "/analysis/rules"
 @page "/solutions/{RegisteredSolutionId:guid}/analysis/rules"
 @using CodePass.Web.Components.RuleAnalysis
+@using CodePass.Web.Components.Rules
 @using CodePass.Web.Data.Entities
 @using CodePass.Web.Services.RuleAnalysis
+@using CodePass.Web.Services.Rules
 @using CodePass.Web.Services.Solutions
 @inject IRegisteredSolutionService RegisteredSolutionService
 @inject IRuleAnalysisRunService RuleAnalysisRunService
 @inject IRuleAnalysisResultService RuleAnalysisResultService
+@inject IRuleDefinitionService RuleDefinitionService
 
 <PageTitle>Rule Analysis</PageTitle>
 
@@ -17,13 +20,21 @@
             <p class="text-body-secondary mb-0">Enable authored rules and review manual analysis results for the selected solution workspace.</p>
         </div>
 
-        <button class="btn btn-primary align-self-start"
-                type="button"
-                disabled="@(SelectedSolution is null || IsRunInProgress)"
-                @onclick="StartRuleAnalysisAsync"
-                data-testid="run-rule-analysis-button">
-            @(IsRunInProgress ? "Running analysis..." : "Run rule analysis")
-        </button>
+        <div class="d-flex flex-wrap gap-2 align-self-start">
+            <button class="btn btn-outline-primary"
+                    type="button"
+                    @onclick="OpenCreateRuleEditorAsync"
+                    data-testid="create-analysis-rule-button">
+                New rule
+            </button>
+            <button class="btn btn-primary"
+                    type="button"
+                    disabled="@(SelectedSolution is null || IsRunInProgress)"
+                    @onclick="StartRuleAnalysisAsync"
+                    data-testid="run-rule-analysis-button">
+                @(IsRunInProgress ? "Running analysis..." : "Run rule analysis")
+            </button>
+        </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(LoadError))
@@ -34,6 +45,11 @@
     @if (!string.IsNullOrWhiteSpace(RunError))
     {
         <div class="alert alert-danger" role="alert" data-testid="rule-analysis-run-error">@RunError</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(RuleEditorError))
+    {
+        <div class="alert alert-danger" role="alert" data-testid="rule-editor-open-error">@RuleEditorError</div>
     }
 
     @if (IsRunInProgress && CurrentProgress is not null)
@@ -115,7 +131,12 @@
         {
             <div class="row g-4">
                 <div class="col-12 col-xxl-5">
-                    <SolutionRuleSelectionPanel RegisteredSolutionId="SelectedSolution.Id" SolutionName="@SelectedSolution.DisplayName" />
+                    <SolutionRuleSelectionPanel @key="RuleSelectionRefreshKey"
+                                                RegisteredSolutionId="SelectedSolution.Id"
+                                                SolutionName="@SelectedSolution.DisplayName"
+                                                OnCreateRule="OpenCreateRuleEditorAsync"
+                                                OnEditRule="OpenEditRuleEditorAsync"
+                                                OnDeleteRule="RequestDeleteRuleAsync" />
                 </div>
                 <div class="col-12 col-xxl-7">
                     @if (IsLoadingLatestRun)
@@ -136,6 +157,35 @@
     }
 </div>
 
+<RuleDefinitionEditor IsOpen="IsRuleEditorOpen"
+                      Rule="RuleBeingEdited"
+                      OnClose="CloseRuleEditorAsync"
+                      OnSaved="HandleRuleSavedAsync" />
+
+@if (IsDeleteConfirmationOpen && RulePendingDeletion is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="delete-rule-confirmation-title">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow">
+                <div class="modal-header">
+                    <h2 class="modal-title h4 mb-0" id="delete-rule-confirmation-title">Delete rule?</h2>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CancelDeleteRuleAsync" disabled="@IsDeletingRule"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Are you sure you want to delete <strong>@RulePendingDeletion.Title</strong>?</p>
+                    <p class="text-body-secondary mb-0">This will permanently remove rule <strong>@RulePendingDeletion.RuleCode</strong> and its solution assignments. This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelDeleteRuleAsync" disabled="@IsDeletingRule" data-testid="cancel-delete-rule-button">Cancel</button>
+                    <button class="btn btn-danger" type="button" @onclick="ConfirmDeleteRuleAsync" disabled="@IsDeletingRule" data-testid="confirm-delete-rule-button">@(IsDeletingRule ? "Deleting..." : "Delete rule")</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
     private bool IsLoadingSolutions { get; set; } = true;
     private bool IsLoadingLatestRun { get; set; }
@@ -143,6 +193,13 @@
     private RuleAnalysisProgressDto? CurrentProgress { get; set; }
     private string? LoadError { get; set; }
     private string? RunError { get; set; }
+    private string? RuleEditorError { get; set; }
+    private bool IsRuleEditorOpen { get; set; }
+    private bool IsDeleteConfirmationOpen { get; set; }
+    private bool IsDeletingRule { get; set; }
+    private int RuleSelectionRefreshKey { get; set; }
+    private AuthoredRuleDefinitionDto? RuleBeingEdited { get; set; }
+    private SolutionRuleSelectionDto? RulePendingDeletion { get; set; }
     private RegisteredSolution? SelectedSolution { get; set; }
     private RuleAnalysisRunDto? LatestRun { get; set; }
     private IReadOnlyList<RegisteredSolution> Solutions { get; set; } = Array.Empty<RegisteredSolution>();
@@ -238,6 +295,105 @@
         finally
         {
             IsRunInProgress = false;
+        }
+    }
+
+    private Task OpenCreateRuleEditorAsync()
+    {
+        RuleEditorError = null;
+        RuleBeingEdited = null;
+        IsRuleEditorOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenEditRuleEditorAsync(Guid ruleId)
+    {
+        try
+        {
+            RuleEditorError = null;
+            var rule = await RuleDefinitionService.GetByIdAsync(ruleId);
+            if (rule is null)
+            {
+                RuleEditorError = "Unable to open rule editor: the selected rule no longer exists.";
+                return;
+            }
+
+            RuleBeingEdited = rule;
+            IsRuleEditorOpen = true;
+        }
+        catch (Exception ex)
+        {
+            RuleBeingEdited = null;
+            IsRuleEditorOpen = false;
+            RuleEditorError = $"Unable to open rule editor: {ex.Message}";
+        }
+    }
+
+    private Task CloseRuleEditorAsync()
+    {
+        RuleBeingEdited = null;
+        IsRuleEditorOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private Task HandleRuleSavedAsync()
+    {
+        RuleBeingEdited = null;
+        IsRuleEditorOpen = false;
+        RuleSelectionRefreshKey++;
+        return Task.CompletedTask;
+    }
+
+    private Task RequestDeleteRuleAsync(SolutionRuleSelectionDto selection)
+    {
+        RuleEditorError = null;
+        RulePendingDeletion = selection;
+        IsDeleteConfirmationOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelDeleteRuleAsync()
+    {
+        if (IsDeletingRule)
+        {
+            return Task.CompletedTask;
+        }
+
+        RulePendingDeletion = null;
+        IsDeleteConfirmationOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmDeleteRuleAsync()
+    {
+        if (RulePendingDeletion is null)
+        {
+            return;
+        }
+
+        try
+        {
+            IsDeletingRule = true;
+            RuleEditorError = null;
+            await RuleDefinitionService.DeleteAsync(RulePendingDeletion.RuleId);
+
+            if (RuleBeingEdited?.Id == RulePendingDeletion.RuleId)
+            {
+                RuleBeingEdited = null;
+                IsRuleEditorOpen = false;
+            }
+
+            RulePendingDeletion = null;
+            IsDeleteConfirmationOpen = false;
+            RuleSelectionRefreshKey++;
+        }
+        catch (Exception ex)
+        {
+            RuleEditorError = $"Unable to delete rule: {ex.Message}";
+        }
+        finally
+        {
+            IsDeletingRule = false;
         }
     }
 

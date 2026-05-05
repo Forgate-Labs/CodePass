@@ -13,6 +13,66 @@ namespace CodePass.Web.Tests.Components;
 public sealed class RuleDefinitionJsonModeTests : TestContext
 {
     [Fact]
+    public async Task AuthoringMode_ShouldRenderFirstAndAllowRawJsonBeforeSelectingRuleKind()
+    {
+        var ruleService = new FakeRuleDefinitionService();
+        Services.AddSingleton<IRuleDefinitionService>(ruleService);
+        Services.AddSingleton<IRuleCatalogService>(new FakeRuleCatalogService());
+
+        var cut = RenderComponent<RuleDefinitionEditor>(parameters => parameters
+            .Add(parameter => parameter.IsOpen, true));
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.IndexOf("Authoring mode", StringComparison.Ordinal).Should().BeLessThan(cut.Markup.IndexOf("Rule metadata", StringComparison.Ordinal));
+            cut.Find("[data-testid='json-mode-button']").TextContent.Should().Contain("Raw JSON");
+        });
+
+        await cut.Find("[data-testid='json-mode-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='rule-raw-json-input']");
+            cut.FindAll("[data-testid='rule-kind-select']").Should().BeEmpty();
+            cut.Find("[data-testid='save-rule-button']").HasAttribute("disabled").Should().BeFalse();
+        });
+
+        var rawJson = JsonSerializer.Serialize(new
+        {
+            id = "CP3999",
+            title = "Create directly from raw json",
+            description = "Created without choosing a rule kind first",
+            kind = "syntax_presence",
+            schemaVersion = "1.0",
+            severity = "warning",
+            enabled = true,
+            scope = new
+            {
+                projects = new[] { "*" },
+                files = new[] { "**/*.cs" },
+                excludeFiles = Array.Empty<string>()
+            },
+            parameters = new
+            {
+                mode = "forbid",
+                targets = new[] { "local_declaration" },
+                syntaxKinds = new[] { "var" },
+                allowInTests = false
+            }
+        }, new JsonSerializerOptions { WriteIndented = true });
+
+        await cut.Find("[data-testid='rule-raw-json-input']").ChangeAsync(new ChangeEventArgs { Value = rawJson });
+        await cut.Find("form").SubmitAsync();
+
+        cut.WaitForAssertion(() =>
+        {
+            ruleService.CreateCalls.Should().Be(1);
+            ruleService.CreatedRequests[0].Code.Should().Be("CP3999");
+            ruleService.CreatedRequests[0].RawDefinitionJson.Should().Contain("syntax_presence");
+        });
+    }
+
+    [Fact]
     public async Task SwitchingToJsonMode_ShouldShowGeneratedFullDslDocument()
     {
         Services.AddSingleton<IRuleDefinitionService>(new FakeRuleDefinitionService());
@@ -32,8 +92,29 @@ public sealed class RuleDefinitionJsonModeTests : TestContext
             rawJson.Should().Contain("\"id\": \"CP3000\"");
             rawJson.Should().Contain("\"title\": \"Avoid var\"");
             rawJson.Should().Contain("\"kind\": \"syntax_presence\"");
+            rawJson.Should().NotContain("\"language\"");
             rawJson.Should().Contain("\"scope\"");
             rawJson.Should().Contain("\"parameters\"");
+        });
+    }
+
+    [Fact]
+    public async Task SwitchingBackToSchemaModeWithoutEditingRawJson_ShouldNotValidateGeneratedPlaceholderJson()
+    {
+        Services.AddSingleton<IRuleDefinitionService>(new FakeRuleDefinitionService());
+        Services.AddSingleton<IRuleCatalogService>(new FakeRuleCatalogService());
+
+        var cut = RenderComponent<RuleDefinitionEditor>(parameters => parameters
+            .Add(parameter => parameter.IsOpen, true));
+
+        await cut.Find("[data-testid='json-mode-button']").ClickAsync(new MouseEventArgs());
+        await cut.Find("[data-testid='schema-mode-button']").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='metadata-editor-section']");
+            cut.FindAll("[data-testid='rule-editor-json-error']").Should().BeEmpty();
+            cut.Find("[data-testid='rule-kind-select']").GetAttribute("value").Should().BeEmpty();
         });
     }
 
@@ -60,7 +141,10 @@ public sealed class RuleDefinitionJsonModeTests : TestContext
         cut.WaitForAssertion(() =>
         {
             ruleService.CreateCalls.Should().Be(0);
-            cut.Find("[data-testid='rule-editor-json-error']").TextContent.Should().Contain("valid JSON");
+            var error = cut.Find("[data-testid='rule-editor-json-error']").TextContent;
+            error.Should().Contain("valid JSON");
+            error.Should().Contain("line");
+            error.Should().Contain("column");
             cut.Find("[data-testid='save-rule-button']").HasAttribute("disabled").Should().BeFalse();
         });
     }
@@ -89,7 +173,6 @@ public sealed class RuleDefinitionJsonModeTests : TestContext
             schemaVersion = "1.0",
             severity = "warning",
             enabled = true,
-            language = "csharp",
             scope = new
             {
                 projects = new[] { "*" },
@@ -142,7 +225,6 @@ public sealed class RuleDefinitionJsonModeTests : TestContext
             schemaVersion = "1.0",
             severity = "error",
             enabled = true,
-            language = "csharp",
             scope = new
             {
                 projects = new[] { "*" },

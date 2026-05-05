@@ -114,7 +114,6 @@ public sealed class RuleDefinitionsPageTests : TestContext
             schemaVersion = "1.0",
             severity = "error",
             enabled = true,
-            language = "csharp",
             scope = new
             {
                 projects = new[] { "*" },
@@ -154,9 +153,11 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
     public int GetAllCalls { get; private set; }
     public int CreateCalls { get; private set; }
     public int UpdateCalls { get; private set; }
+    public int DeleteCalls { get; private set; }
 
     public List<SaveAuthoredRuleDefinitionRequest> CreatedRequests { get; } = [];
     public List<(Guid Id, SaveAuthoredRuleDefinitionRequest Request)> UpdatedRequests { get; } = [];
+    public List<Guid> DeletedIds { get; } = [];
 
     public Task<IReadOnlyList<AuthoredRuleDefinitionDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -193,6 +194,8 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        DeleteCalls++;
+        DeletedIds.Add(id);
         _rules.RemoveAll(rule => rule.Id == id);
         return Task.CompletedTask;
     }
@@ -231,7 +234,6 @@ internal sealed class FakeRuleDefinitionService(params AuthoredRuleDefinitionDto
             ["schemaVersion"] = schemaVersion,
             ["severity"] = severity.ToString().ToLowerInvariant(),
             ["enabled"] = isEnabled,
-            ["language"] = "csharp",
             ["scope"] = JsonSerializer.Deserialize<JsonElement>(scopeJson),
             ["parameters"] = JsonSerializer.Deserialize<JsonElement>(parametersJson)
         });
