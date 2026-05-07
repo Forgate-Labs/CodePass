@@ -156,6 +156,49 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
                             }
 
                             break;
+                        case "class_metrics":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzeClassMetrics(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
+                        case "interface_metrics":
+                            findings.AddRange(AnalyzeInterfaceMetrics(rule, root, relativePath, cancellationToken));
+                            break;
+                        case "inheritance_contract_policy":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzeInheritanceContractPolicy(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
+                        case "polymorphism_opportunity":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzePolymorphismOpportunity(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
+                        case "architecture_policy":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzeArchitecturePolicy(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
+                        case "dependency_inversion_policy":
+                            semanticModel ??= await document.GetSemanticModelAsync(cancellationToken);
+                            if (semanticModel is not null)
+                            {
+                                findings.AddRange(AnalyzeDependencyInversionPolicy(rule, root, semanticModel, relativePath, cancellationToken));
+                            }
+
+                            break;
                         case "method_metrics":
                             findings.AddRange(AnalyzeMethodMetrics(rule, root, relativePath, cancellationToken));
                             break;
@@ -548,6 +591,310 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
         return findings;
     }
 
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeClassMetrics(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var maxLines = GetInt(parameters, "maxLines") ?? 300;
+        var maxMethods = GetInt(parameters, "maxMethods") ?? 15;
+        var maxPublicMethods = GetInt(parameters, "maxPublicMethods") ?? 10;
+        var maxDependencies = GetInt(parameters, "maxDependencies") ?? 5;
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var classDeclaration in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var methodCount = classDeclaration.Members.OfType<MethodDeclarationSyntax>().Count();
+            var publicMethodCount = classDeclaration.Members.OfType<MethodDeclarationSyntax>().Count(method => method.Modifiers.Any(SyntaxKind.PublicKeyword));
+            var lineCount = CountLines(classDeclaration.GetLocation());
+            var dependencyCount = CountClassDependencies(classDeclaration, semanticModel, cancellationToken);
+            var violations = new List<string>();
+
+            if (maxLines > 0 && lineCount > maxLines)
+            {
+                violations.Add($"{lineCount} lines exceeds {maxLines}");
+            }
+
+            if (maxMethods > 0 && methodCount > maxMethods)
+            {
+                violations.Add($"{methodCount} methods exceeds {maxMethods}");
+            }
+
+            if (maxPublicMethods > 0 && publicMethodCount > maxPublicMethods)
+            {
+                violations.Add($"{publicMethodCount} public methods exceeds {maxPublicMethods}");
+            }
+
+            if (maxDependencies > 0 && dependencyCount > maxDependencies)
+            {
+                violations.Add($"{dependencyCount} dependencies exceeds {maxDependencies}");
+            }
+
+            if (violations.Count > 0)
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' class '{classDeclaration.Identifier.ValueText}' violates metrics policy: {string.Join("; ", violations)}.",
+                    relativePath,
+                    classDeclaration.Identifier.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeInterfaceMetrics(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var maxMethods = GetInt(parameters, "maxMethods") ?? 7;
+        var maxProperties = GetInt(parameters, "maxProperties") ?? 5;
+        var forbidNotImplementedMembers = GetBoolean(parameters, "forbidNotImplementedMembers");
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var interfaceDeclaration in root.DescendantNodes().OfType<InterfaceDeclarationSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var methodCount = interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>().Count();
+            var propertyCount = interfaceDeclaration.Members.OfType<PropertyDeclarationSyntax>().Count();
+            var violations = new List<string>();
+
+            if (maxMethods > 0 && methodCount > maxMethods)
+            {
+                violations.Add($"{methodCount} methods exceeds {maxMethods}");
+            }
+
+            if (maxProperties > 0 && propertyCount > maxProperties)
+            {
+                violations.Add($"{propertyCount} properties exceeds {maxProperties}");
+            }
+
+            if (violations.Count > 0)
+            {
+                findings.Add(CreateFinding(
+                    rule,
+                    $"Rule '{rule.Code}' interface '{interfaceDeclaration.Identifier.ValueText}' violates metrics policy: {string.Join("; ", violations)}.",
+                    relativePath,
+                    interfaceDeclaration.Identifier.GetLocation()));
+            }
+        }
+
+        if (forbidNotImplementedMembers)
+        {
+            foreach (var member in root.DescendantNodes().OfType<MemberDeclarationSyntax>().Where(MemberThrowsNotImplemented))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids members that throw NotImplementedException.", relativePath, member.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeInheritanceContractPolicy(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var forbidNotSupportedInOverrides = GetBoolean(parameters, "forbidNotSupportedInOverrides", defaultValue: true);
+        var forbidMemberHiding = GetBoolean(parameters, "forbidMemberHiding", defaultValue: true);
+        var requireNullableCompatibility = GetBoolean(parameters, "requireNullableCompatibility", defaultValue: true);
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var member in root.DescendantNodes().OfType<MemberDeclarationSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var modifiers = GetMemberModifiers(member);
+            if (forbidMemberHiding && modifiers.Any(SyntaxKind.NewKeyword))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids member hiding with the 'new' modifier.", relativePath, member.GetLocation()));
+            }
+
+            if (forbidNotSupportedInOverrides && modifiers.Any(SyntaxKind.OverrideKeyword) && MemberThrowsNotSupported(member))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids override members that throw NotSupportedException or NotImplementedException.", relativePath, member.GetLocation()));
+            }
+        }
+
+        if (requireNullableCompatibility)
+        {
+            foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>().Where(method => method.Modifiers.Any(SyntaxKind.OverrideKeyword)))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (semanticModel.GetDeclaredSymbol(method, cancellationToken) is IMethodSymbol { OverriddenMethod: { } overriddenMethod } methodSymbol
+                    && methodSymbol.ReturnNullableAnnotation == NullableAnnotation.Annotated
+                    && overriddenMethod.ReturnNullableAnnotation == NullableAnnotation.NotAnnotated)
+                {
+                    findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' requires override method '{method.Identifier.ValueText}' to keep nullable return compatibility with its base contract.", relativePath, method.Identifier.GetLocation()));
+                }
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzePolymorphismOpportunity(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var maxSwitchCases = GetInt(parameters, "maxSwitchCases") ?? 5;
+        var detectTypeChecks = GetBoolean(parameters, "detectTypeChecks", defaultValue: true);
+        var detectEnumDispatch = GetBoolean(parameters, "detectEnumDispatch", defaultValue: true);
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var switchStatement in root.DescendantNodes().OfType<SwitchStatementSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var caseCount = switchStatement.Sections.SelectMany(section => section.Labels).Count(label => label.IsKind(SyntaxKind.CaseSwitchLabel));
+            if (maxSwitchCases > 0 && caseCount > maxSwitchCases)
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' found switch with {caseCount} cases, exceeding {maxSwitchCases}; consider a dispatch abstraction when this represents varying behavior.", relativePath, switchStatement.SwitchKeyword.GetLocation()));
+            }
+
+            if (detectEnumDispatch && IsEnumExpression(switchStatement.Expression, semanticModel, cancellationToken))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' found dispatch over enum value; consider polymorphism when cases represent behavior variants.", relativePath, switchStatement.Expression.GetLocation()));
+            }
+        }
+
+        if (detectTypeChecks)
+        {
+            foreach (var node in root.DescendantNodes().Where(IsTypeCheckSyntax))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' found type-check based branching; consider polymorphism when behavior varies by concrete type.", relativePath, node.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeArchitecturePolicy(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var sourceNamespaces = GetStringArray(parameters, "sourceNamespaces").ToArray();
+        var allowedNamespaces = GetStringArray(parameters, "allowedNamespaces").ToArray();
+        var forbiddenNamespaces = GetStringArray(parameters, "forbiddenNamespaces").ToArray();
+        var allowSameNamespace = GetBoolean(parameters, "allowSameNamespace", defaultValue: true);
+
+        var declaredNamespace = GetDeclaredNamespace(root);
+        if (sourceNamespaces.Length > 0 && !sourceNamespaces.Any(source => NamespaceMatches(declaredNamespace, source)))
+        {
+            return [];
+        }
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var node in root.DescendantNodes().Where(IsDependencySyntaxNode))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var symbol = semanticModel.GetSymbolInfo(node, cancellationToken).Symbol ?? semanticModel.GetTypeInfo(node, cancellationToken).Type;
+            var dependencyNamespace = GetSymbolNamespace(symbol);
+            if (string.IsNullOrWhiteSpace(dependencyNamespace))
+            {
+                continue;
+            }
+
+            var forbiddenNamespace = forbiddenNamespaces.FirstOrDefault(forbidden => NamespaceMatches(dependencyNamespace, forbidden));
+            if (forbiddenNamespace is not null)
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids architecture dependency on namespace '{forbiddenNamespace}'.", relativePath, node.GetLocation()));
+                continue;
+            }
+
+            if (allowedNamespaces.Length > 0
+                && !allowedNamespaces.Any(allowed => NamespaceMatches(dependencyNamespace, allowed))
+                && !(allowSameNamespace && NamespaceMatches(dependencyNamespace, declaredNamespace)))
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' allows dependencies only on configured namespaces; found '{dependencyNamespace}'.", relativePath, node.GetLocation()));
+            }
+        }
+
+        return findings;
+    }
+
+    private static IReadOnlyList<RuleAnalysisFinding> AnalyzeDependencyInversionPolicy(
+        AuthoredRuleDefinitionDto rule,
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        using var parametersDocument = ParseRuleJsonDocument(rule, rule.ParametersJson, "parameters JSON");
+        var parameters = parametersDocument.RootElement;
+        var sourceNamespaces = GetStringArray(parameters, "sourceNamespaces").ToArray();
+        var forbiddenNamespaces = GetStringArray(parameters, "forbiddenNamespaces").ToArray();
+        var forbidConcreteDependencies = GetBoolean(parameters, "forbidConcreteDependencies", defaultValue: true);
+        var allowedAbstractionPrefixes = GetStringArray(parameters, "allowedAbstractionPrefixes").DefaultIfEmpty("I").ToArray();
+
+        var declaredNamespace = GetDeclaredNamespace(root);
+        if (sourceNamespaces.Length > 0 && !sourceNamespaces.Any(source => NamespaceMatches(declaredNamespace, source)))
+        {
+            return [];
+        }
+
+        var findings = new List<RuleAnalysisFinding>();
+        foreach (var node in root.DescendantNodes().Where(IsDependencySyntaxNode))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var symbol = semanticModel.GetSymbolInfo(node, cancellationToken).Symbol ?? semanticModel.GetTypeInfo(node, cancellationToken).Type;
+            var forbiddenNamespace = forbiddenNamespaces.FirstOrDefault(forbidden => SymbolNamespaceMatches(symbol, forbidden));
+            if (forbiddenNamespace is not null)
+            {
+                findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' forbids dependency on detail namespace '{forbiddenNamespace}'.", relativePath, node.GetLocation()));
+            }
+        }
+
+        if (forbidConcreteDependencies)
+        {
+            foreach (var parameter in root.DescendantNodes().OfType<ConstructorDeclarationSyntax>().SelectMany(constructor => constructor.ParameterList.Parameters))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (parameter.Type is not null && semanticModel.GetTypeInfo(parameter.Type, cancellationToken).Type is INamedTypeSymbol type && IsConcreteDependency(type, allowedAbstractionPrefixes))
+                {
+                    findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' requires constructor dependency parameter '{parameter.Identifier.ValueText}' to depend on an abstraction instead of concrete type '{type.Name}'.", relativePath, parameter.GetLocation()));
+                }
+            }
+
+            foreach (var field in root.DescendantNodes().OfType<FieldDeclarationSyntax>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (semanticModel.GetTypeInfo(field.Declaration.Type, cancellationToken).Type is INamedTypeSymbol type && IsConcreteDependency(type, allowedAbstractionPrefixes))
+                {
+                    findings.Add(CreateFinding(rule, $"Rule '{rule.Code}' requires field dependencies to use abstractions instead of concrete type '{type.Name}'.", relativePath, field.Declaration.Type.GetLocation()));
+                }
+            }
+        }
+
+        return findings;
+    }
+
     private static IReadOnlyList<RuleAnalysisFinding> AnalyzeMethodMetrics(
         AuthoredRuleDefinitionDto rule,
         SyntaxNode root,
@@ -890,6 +1237,87 @@ public sealed class RoslynRuleAnalyzer : IRuleAnalyzer
             MemberAccessExpressionSyntax => true,
             _ => false
         };
+    }
+
+    private static int CountClassDependencies(ClassDeclarationSyntax classDeclaration, SemanticModel semanticModel, CancellationToken cancellationToken)
+    {
+        var dependencies = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var parameter in classDeclaration.Members.OfType<ConstructorDeclarationSyntax>().SelectMany(constructor => constructor.ParameterList.Parameters))
+        {
+            if (parameter.Type is not null && semanticModel.GetTypeInfo(parameter.Type, cancellationToken).Type is { } type)
+            {
+                dependencies.Add(type.ToDisplayString(SymbolDisplayFormat));
+            }
+        }
+
+        foreach (var field in classDeclaration.Members.OfType<FieldDeclarationSyntax>())
+        {
+            if (semanticModel.GetTypeInfo(field.Declaration.Type, cancellationToken).Type is { } type)
+            {
+                dependencies.Add(type.ToDisplayString(SymbolDisplayFormat));
+            }
+        }
+
+        return dependencies.Count;
+    }
+
+    private static bool MemberThrowsNotImplemented(MemberDeclarationSyntax member)
+        => member.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Any(creation =>
+            creation.Type.ToString() is "NotImplementedException" or "System.NotImplementedException");
+
+    private static bool MemberThrowsNotSupported(MemberDeclarationSyntax member)
+        => member.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Any(creation =>
+            creation.Type.ToString() is "NotSupportedException" or "System.NotSupportedException" or "NotImplementedException" or "System.NotImplementedException");
+
+    private static SyntaxTokenList GetMemberModifiers(MemberDeclarationSyntax member)
+        => member switch
+        {
+            BaseMethodDeclarationSyntax method => method.Modifiers,
+            BasePropertyDeclarationSyntax property => property.Modifiers,
+            BaseFieldDeclarationSyntax field => field.Modifiers,
+            BaseTypeDeclarationSyntax type => type.Modifiers,
+            _ => default
+        };
+
+    private static bool IsEnumExpression(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken)
+        => semanticModel.GetTypeInfo(expression, cancellationToken).Type?.TypeKind == TypeKind.Enum;
+
+    private static bool IsTypeCheckSyntax(SyntaxNode node)
+        => node.IsKind(SyntaxKind.IsExpression)
+            || node.IsKind(SyntaxKind.AsExpression)
+            || node is IsPatternExpressionSyntax { Pattern: DeclarationPatternSyntax or TypePatternSyntax };
+
+    private static string GetDeclaredNamespace(SyntaxNode root)
+        => root.DescendantNodes()
+            .OfType<BaseNamespaceDeclarationSyntax>()
+            .Select(ns => ns.Name.ToString())
+            .FirstOrDefault() ?? string.Empty;
+
+    private static string? GetSymbolNamespace(ISymbol? symbol)
+        => symbol switch
+        {
+            INamedTypeSymbol typeSymbol => typeSymbol.ContainingNamespace?.ToDisplayString(),
+            IMethodSymbol methodSymbol => methodSymbol.ContainingType?.ContainingNamespace?.ToDisplayString(),
+            IPropertySymbol propertySymbol => propertySymbol.ContainingType?.ContainingNamespace?.ToDisplayString(),
+            IFieldSymbol fieldSymbol => fieldSymbol.ContainingType?.ContainingNamespace?.ToDisplayString(),
+            _ => symbol?.ContainingNamespace?.ToDisplayString()
+        };
+
+    private static bool IsConcreteDependency(INamedTypeSymbol type, IReadOnlyList<string> allowedAbstractionPrefixes)
+    {
+        if (type.TypeKind is TypeKind.Interface or TypeKind.TypeParameter || type.IsAbstract)
+        {
+            return false;
+        }
+
+        var namespaceName = type.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+        if (NamespaceMatches(namespaceName, "System") || type.SpecialType != SpecialType.None)
+        {
+            return false;
+        }
+
+        return !allowedAbstractionPrefixes.Any(prefix => type.Name.StartsWith(prefix, StringComparison.Ordinal));
     }
 
     private static int CountLines(Location location)

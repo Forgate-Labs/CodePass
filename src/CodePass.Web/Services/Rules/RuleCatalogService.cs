@@ -124,6 +124,123 @@ public sealed class RuleCatalogService : IRuleCatalogService
                 CreateField("maxCyclomaticComplexity", "Max cyclomatic complexity", "Maximum cyclomatic complexity.", "number", false, Serialize(10))
             ]),
         new(
+            Kind: "class_metrics",
+            Title: "Class metrics policy",
+            Description: "Limit class size, method count, public surface, and constructor/field dependencies.",
+            SchemaVersion: "1.0",
+            Language: "csharp",
+            AnalysisLevel: "semantic",
+            ScopeFields:
+            [
+                CreateField("projects", "Projects", "Project glob patterns included by the rule.", "array", false, Serialize(new[] { "*" })),
+                CreateField("files", "Files", "File glob patterns included by the rule.", "array", false, Serialize(new[] { "**/*.cs" })),
+                CreateField("excludeFiles", "Exclude files", "File glob patterns excluded from the rule.", "array", false, Serialize(Array.Empty<string>()))
+            ],
+            ParameterFields:
+            [
+                CreateField("maxLines", "Max lines", "Maximum class line count.", "number", false, Serialize(300)),
+                CreateField("maxMethods", "Max methods", "Maximum methods declared directly in a class.", "number", false, Serialize(15)),
+                CreateField("maxPublicMethods", "Max public methods", "Maximum public methods declared directly in a class.", "number", false, Serialize(10)),
+                CreateField("maxDependencies", "Max dependencies", "Maximum distinct constructor and field dependency types.", "number", false, Serialize(5))
+            ]),
+        new(
+            Kind: "interface_metrics",
+            Title: "Interface metrics policy",
+            Description: "Limit interface size and detect unimplemented member placeholders.",
+            SchemaVersion: "1.0",
+            Language: "csharp",
+            AnalysisLevel: "syntax",
+            ScopeFields:
+            [
+                CreateField("projects", "Projects", "Project glob patterns included by the rule.", "array", false, Serialize(new[] { "*" })),
+                CreateField("files", "Files", "File glob patterns included by the rule.", "array", false, Serialize(new[] { "**/*.cs" })),
+                CreateField("excludeFiles", "Exclude files", "File glob patterns excluded from the rule.", "array", false, Serialize(Array.Empty<string>()))
+            ],
+            ParameterFields:
+            [
+                CreateField("maxMethods", "Max methods", "Maximum methods declared in an interface.", "number", false, Serialize(7)),
+                CreateField("maxProperties", "Max properties", "Maximum properties declared in an interface.", "number", false, Serialize(5)),
+                CreateField("forbidNotImplementedMembers", "Forbid not implemented members", "Whether members throwing NotImplementedException are violations.", "boolean", false, Serialize(false))
+            ]),
+        new(
+            Kind: "inheritance_contract_policy",
+            Title: "Inheritance contract policy",
+            Description: "Detect risky inheritance patterns such as member hiding and unsupported overrides.",
+            SchemaVersion: "1.0",
+            Language: "csharp",
+            AnalysisLevel: "semantic",
+            ScopeFields:
+            [
+                CreateField("projects", "Projects", "Project glob patterns included by the rule.", "array", false, Serialize(new[] { "*" })),
+                CreateField("files", "Files", "File glob patterns included by the rule.", "array", false, Serialize(new[] { "**/*.cs" })),
+                CreateField("excludeFiles", "Exclude files", "File glob patterns excluded from the rule.", "array", false, Serialize(Array.Empty<string>()))
+            ],
+            ParameterFields:
+            [
+                CreateField("forbidNotSupportedInOverrides", "Forbid unsupported overrides", "Whether overrides throwing NotSupportedException or NotImplementedException are violations.", "boolean", false, Serialize(true)),
+                CreateField("forbidMemberHiding", "Forbid member hiding", "Whether members using the new modifier are violations.", "boolean", false, Serialize(true)),
+                CreateField("requireNullableCompatibility", "Require nullable compatibility", "Whether override return nullability must not weaken the base contract.", "boolean", false, Serialize(true))
+            ]),
+        new(
+            Kind: "polymorphism_opportunity",
+            Title: "Polymorphism opportunity",
+            Description: "Detect dispatch patterns that may be candidates for strategy or polymorphism.",
+            SchemaVersion: "1.0",
+            Language: "csharp",
+            AnalysisLevel: "semantic",
+            ScopeFields:
+            [
+                CreateField("projects", "Projects", "Project glob patterns included by the rule.", "array", false, Serialize(new[] { "*" })),
+                CreateField("files", "Files", "File glob patterns included by the rule.", "array", false, Serialize(new[] { "**/*.cs" })),
+                CreateField("excludeFiles", "Exclude files", "File glob patterns excluded from the rule.", "array", false, Serialize(Array.Empty<string>()))
+            ],
+            ParameterFields:
+            [
+                CreateField("maxSwitchCases", "Max switch cases", "Maximum switch case labels before reporting a dispatch hotspot.", "number", false, Serialize(5)),
+                CreateField("detectTypeChecks", "Detect type checks", "Whether is/as/pattern type checks are reported.", "boolean", false, Serialize(true)),
+                CreateField("detectEnumDispatch", "Detect enum dispatch", "Whether switch statements over enum expressions are reported.", "boolean", false, Serialize(true))
+            ]),
+        new(
+            Kind: "architecture_policy",
+            Title: "Architecture policy",
+            Description: "Restrict namespace dependencies for selected source namespaces.",
+            SchemaVersion: "1.0",
+            Language: "csharp",
+            AnalysisLevel: "semantic",
+            ScopeFields:
+            [
+                CreateField("projects", "Projects", "Project glob patterns included by the rule.", "array", false, Serialize(new[] { "*" })),
+                CreateField("files", "Files", "File glob patterns included by the rule.", "array", false, Serialize(new[] { "**/*.cs" })),
+                CreateField("excludeFiles", "Exclude files", "File glob patterns excluded from the rule.", "array", false, Serialize(Array.Empty<string>()))
+            ],
+            ParameterFields:
+            [
+                CreateField("sourceNamespaces", "Source namespaces", "Optional namespaces where the architecture policy applies.", "array", false, Serialize(Array.Empty<string>())),
+                CreateField("allowedNamespaces", "Allowed namespaces", "Optional namespace allowlist for dependencies.", "array", false, Serialize(Array.Empty<string>())),
+                CreateField("forbiddenNamespaces", "Forbidden namespaces", "Namespaces that matching code cannot depend on.", "array", false, Serialize(Array.Empty<string>())),
+                CreateField("allowSameNamespace", "Allow same namespace", "Whether dependencies inside the declaring namespace are allowed when an allowlist is configured.", "boolean", false, Serialize(true))
+            ]),
+        new(
+            Kind: "dependency_inversion_policy",
+            Title: "Dependency inversion policy",
+            Description: "Detect dependencies on details and concrete constructor or field dependencies.",
+            SchemaVersion: "1.0",
+            Language: "csharp",
+            AnalysisLevel: "semantic",
+            ScopeFields:
+            [
+                CreateField("projects", "Projects", "Project glob patterns included by the rule.", "array", false, Serialize(new[] { "*" })),
+                CreateField("files", "Files", "File glob patterns included by the rule.", "array", false, Serialize(new[] { "**/*.cs" })),
+                CreateField("excludeFiles", "Exclude files", "File glob patterns excluded from the rule.", "array", false, Serialize(Array.Empty<string>()))
+            ],
+            ParameterFields:
+            [
+                CreateField("sourceNamespaces", "Source namespaces", "Optional namespaces where the policy applies.", "array", false, Serialize(Array.Empty<string>())),
+                CreateField("forbiddenNamespaces", "Forbidden namespaces", "Detail namespaces that matching code cannot depend on.", "array", false, Serialize(Array.Empty<string>())),
+                CreateField("forbidConcreteDependencies", "Forbid concrete dependencies", "Whether constructor parameters and fields must depend on abstractions.", "boolean", false, Serialize(true)),
+                CreateField("allowedAbstractionPrefixes", "Allowed abstraction prefixes", "Type name prefixes treated as abstractions in addition to interfaces and abstract types.", "array", false, Serialize(new[] { "I" }))
+            ]),
+        new(
             Kind: "exception_handling",
             Title: "Exception handling policy",
             Description: "Detect risky exception handling patterns.",

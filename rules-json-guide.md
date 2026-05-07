@@ -79,6 +79,12 @@ Exemplo excluindo migrations e generated code:
 - `attribute_policy`
 - `dependency_policy`
 - `method_metrics`
+- `class_metrics`
+- `interface_metrics`
+- `inheritance_contract_policy`
+- `polymorphism_opportunity`
+- `architecture_policy`
+- `dependency_inversion_policy`
 - `exception_handling`
 - `async_policy`
 
@@ -436,7 +442,121 @@ Valores `<= 0` desativam o limite correspondente na execução atual.
 
 ---
 
-## 7. `exception_handling`
+## 7. `class_metrics`
+
+Limita métricas simples de classes.
+
+### Parameters
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---:|---:|---|
+| `maxLines` | number inteiro | não | Máximo de linhas por classe. |
+| `maxMethods` | number inteiro | não | Máximo de métodos declarados diretamente. |
+| `maxPublicMethods` | number inteiro | não | Máximo de métodos públicos declarados diretamente. |
+| `maxDependencies` | number inteiro | não | Máximo de tipos distintos usados em construtores e fields. |
+
+Valores `<= 0` desativam o limite correspondente.
+
+### Exemplo
+
+```json
+{
+  "id": "CP6101",
+  "title": "Limitar classes",
+  "description": "Classes menores tendem a concentrar menos responsabilidades.",
+  "kind": "class_metrics",
+  "schemaVersion": "1.0",
+  "severity": "warning",
+  "enabled": true,
+  "scope": {
+    "projects": ["*"],
+    "files": ["**/*.cs"],
+    "excludeFiles": ["**/*.g.cs"]
+  },
+  "parameters": {
+    "maxLines": 300,
+    "maxMethods": 15,
+    "maxPublicMethods": 10,
+    "maxDependencies": 5
+  }
+}
+```
+
+---
+
+## 8. `interface_metrics`
+
+Limita tamanho de interfaces e pode detectar membros placeholder não implementados.
+
+### Parameters
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---:|---:|---|
+| `maxMethods` | number inteiro | não | Máximo de métodos por interface. |
+| `maxProperties` | number inteiro | não | Máximo de propriedades por interface. |
+| `forbidNotImplementedMembers` | boolean | não | Proíbe membros que lançam `NotImplementedException`. |
+
+---
+
+## 9. `inheritance_contract_policy`
+
+Detecta padrões arriscados em herança.
+
+### Parameters
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---:|---:|---|
+| `forbidNotSupportedInOverrides` | boolean | não | Proíbe overrides que lançam `NotSupportedException` ou `NotImplementedException`. |
+| `forbidMemberHiding` | boolean | não | Proíbe membros com modificador `new`. |
+| `requireNullableCompatibility` | boolean | não | Reporta override que torna retorno nullable quando a base não permite. |
+
+---
+
+## 10. `polymorphism_opportunity`
+
+Detecta pontos de dispatch que podem indicar oportunidade de estratégia/polimorfismo.
+
+### Parameters
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---:|---:|---|
+| `maxSwitchCases` | number inteiro | não | Máximo de `case` antes de reportar hotspot. |
+| `detectTypeChecks` | boolean | não | Reporta `is`, `as` e pattern matching por tipo. |
+| `detectEnumDispatch` | boolean | não | Reporta `switch` sobre enum. |
+
+---
+
+## 11. `architecture_policy`
+
+Restringe dependências entre namespaces para políticas de arquitetura em camadas, clean architecture, hexagonal etc.
+
+### Parameters
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---:|---:|---|
+| `sourceNamespaces` | array de string | não | Namespaces onde a regra se aplica. Vazio aplica geral. |
+| `allowedNamespaces` | array de string | não | Allowlist opcional de namespaces permitidos. Vazio desativa allowlist. |
+| `forbiddenNamespaces` | array de string | não | Namespaces proibidos. |
+| `allowSameNamespace` | boolean | não | Permite dependências dentro do namespace declarador quando há allowlist. |
+
+---
+
+## 12. `dependency_inversion_policy`
+
+Detecta dependência de namespaces de detalhe e dependências concretas em construtores/fields.
+
+### Parameters
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---:|---:|---|
+| `sourceNamespaces` | array de string | não | Namespaces onde a regra se aplica. Vazio aplica geral. |
+| `forbiddenNamespaces` | array de string | não | Namespaces de detalhe proibidos. |
+| `forbidConcreteDependencies` | boolean | não | Exige abstrações em parâmetros e fields de dependência. |
+| `allowedAbstractionPrefixes` | array de string | não | Prefixos tratados como abstração além de interfaces/classes abstratas. Default prático: `["I"]`. |
+
+---
+
+## 13. `exception_handling`
 
 Detecta padrões arriscados de tratamento de exceção.
 
@@ -476,7 +596,7 @@ Detecta padrões arriscados de tratamento de exceção.
 
 ---
 
-## 8. `async_policy`
+## 14. `async_policy`
 
 Detecta problemas comuns de código assíncrono.
 

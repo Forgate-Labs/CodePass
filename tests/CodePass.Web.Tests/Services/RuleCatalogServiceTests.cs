@@ -19,6 +19,12 @@ public sealed class RuleCatalogServiceTests
             "attribute_policy",
             "dependency_policy",
             "method_metrics",
+            "class_metrics",
+            "interface_metrics",
+            "inheritance_contract_policy",
+            "polymorphism_opportunity",
+            "architecture_policy",
+            "dependency_inversion_policy",
             "exception_handling",
             "async_policy");
         catalog.Should().OnlyContain(rule => rule.SchemaVersion == "1.0");

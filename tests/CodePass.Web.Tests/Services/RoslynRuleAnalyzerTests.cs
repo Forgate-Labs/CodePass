@@ -284,6 +284,90 @@ public sealed class RoslynRuleAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ShouldReportGenericDesignPolicyViolations()
+    {
+        using var fixture = await RoslynSolutionFixture.CreateAsync(
+            """
+            using System;
+            using System.Text;
+
+            namespace SampleProject;
+
+            public enum Kind { A, B, C }
+
+            public sealed class Dependency { }
+
+            public interface IFat
+            {
+                void A();
+                void B();
+                int Value { get; }
+            }
+
+            public class BaseTarget
+            {
+                public string Hidden => "base";
+
+                public virtual void Run() { }
+            }
+
+            public sealed class PolicyTarget : BaseTarget
+            {
+                private readonly Dependency dependency;
+
+                public PolicyTarget(Dependency dependency)
+                {
+                    this.dependency = dependency;
+                }
+
+                public new string Hidden => "hidden";
+
+                public override void Run()
+                {
+                    throw new NotSupportedException();
+                }
+
+                public void Dispatch(object value, Kind kind)
+                {
+                    _ = new StringBuilder();
+                    switch (kind)
+                    {
+                        case Kind.A: break;
+                        case Kind.B: break;
+                        case Kind.C: break;
+                    }
+
+                    if (value is string text)
+                    {
+                        Console.WriteLine(text);
+                    }
+                }
+
+                public void Extra() { }
+            }
+            """);
+
+        var rules = new[]
+        {
+            CreateRule("CP9101", "Class metrics", "class_metrics", RuleSeverity.Warning, "{\"maxLines\":20,\"maxMethods\":1,\"maxPublicMethods\":1,\"maxDependencies\":0}"),
+            CreateRule("CP9102", "Interface metrics", "interface_metrics", RuleSeverity.Warning, "{\"maxMethods\":1,\"maxProperties\":0,\"forbidNotImplementedMembers\":false}"),
+            CreateRule("CP9103", "Inheritance contracts", "inheritance_contract_policy", RuleSeverity.Warning, "{\"forbidNotSupportedInOverrides\":true,\"forbidMemberHiding\":true,\"requireNullableCompatibility\":false}"),
+            CreateRule("CP9104", "Polymorphism opportunities", "polymorphism_opportunity", RuleSeverity.Info, "{\"maxSwitchCases\":2,\"detectTypeChecks\":true,\"detectEnumDispatch\":true}"),
+            CreateRule("CP9105", "Architecture", "architecture_policy", RuleSeverity.Error, "{\"sourceNamespaces\":[\"SampleProject\"],\"allowedNamespaces\":[],\"forbiddenNamespaces\":[\"System.Text\"],\"allowSameNamespace\":true}"),
+            CreateRule("CP9106", "Dependency inversion", "dependency_inversion_policy", RuleSeverity.Warning, "{\"sourceNamespaces\":[\"SampleProject\"],\"forbiddenNamespaces\":[\"System.Text\"],\"forbidConcreteDependencies\":true,\"allowedAbstractionPrefixes\":[\"I\"]}")
+        };
+
+        var findings = await new RoslynRuleAnalyzer().AnalyzeAsync(fixture.SolutionPath, rules);
+
+        findings.Should().Contain(finding => finding.RuleKind == "class_metrics");
+        findings.Should().Contain(finding => finding.RuleKind == "interface_metrics");
+        findings.Should().Contain(finding => finding.RuleKind == "inheritance_contract_policy");
+        findings.Should().Contain(finding => finding.RuleKind == "polymorphism_opportunity");
+        findings.Should().Contain(finding => finding.RuleKind == "architecture_policy");
+        findings.Should().Contain(finding => finding.RuleKind == "dependency_inversion_policy");
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_ShouldReturnNoFindingsForEmptyRuleList()
     {
         var findings = await new RoslynRuleAnalyzer().AnalyzeAsync("/tmp/missing-solution.sln", []);
