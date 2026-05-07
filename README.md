@@ -1,57 +1,57 @@
 # CodePass
 
-CodePass é uma plataforma self-hosted de qualidade de código para soluções C#/.NET. O foco do projeto é oferecer análise local, leve e profundamente integrada ao ecossistema .NET, com regras customizáveis em JSON executadas sobre Roslyn.
+CodePass is a self-hosted code quality platform for C#/.NET solutions. It focuses on local, lightweight, deeply .NET-native analysis with customizable JSON rules executed on top of Roslyn.
 
-A proposta é parecida com ferramentas de qualidade como SonarQube, mas com escopo mais focado: C#/.NET, execução local, regras autorais e uma experiência simples para registrar uma `.sln`, rodar análises e entender se o projeto passa ou falha.
+The product is inspired by quality platforms such as SonarQube, but with a narrower scope: C#/.NET, local execution, user-authored rules, and a simple workflow to register a `.sln`, run analyses, and understand whether the project passes or fails.
 
-## Funcionalidades principais
+## Main features
 
-- Cadastro de soluções locais por caminho de arquivo `.sln`.
-- Validação e atualização do status das soluções cadastradas.
-- Criação e edição de regras customizadas pelo editor schema-driven.
-- Edição de regras em raw JSON.
-- Seleção de regras por solução cadastrada.
-- Análise de regras com Roslyn.
-- Persistência de execuções e violações encontradas.
-- Análise de cobertura via `dotnet test --collect:"XPlat Code Coverage"`.
-- Normalização de cobertura em nível de projeto e classe.
-- Dashboard com quality score, status pass/fail e detalhamento das contribuições de regras e cobertura.
-- API local para agentes executarem análise de qualidade.
-- CLI para análise por linha de comando.
+- Register local solutions by `.sln` file path.
+- Validate and refresh registered solution status.
+- Create and edit custom rules through a schema-driven editor.
+- Edit rules directly as raw JSON.
+- Enable or disable rules per registered solution.
+- Run Roslyn-based rule analysis.
+- Persist analysis runs and violations.
+- Run coverage analysis with `dotnet test --collect:"XPlat Code Coverage"`.
+- Normalize coverage at project and class level.
+- Show a dashboard with quality score, pass/fail status, and rule/coverage evidence.
+- Expose a local API for agents to run quality analysis.
+- Provide a CLI for headless analysis.
 
-## Stack atual
+## Current stack
 
 - .NET 10
 - ASP.NET Core / Blazor Server
 - Entity Framework Core
 - SQLite
 - Roslyn / MSBuildWorkspace
-- Cobertura como formato normalizado de cobertura
-- xUnit, bUnit e FluentAssertions nos testes
+- Cobertura as the normalized coverage format
+- xUnit, bUnit, and FluentAssertions for tests
 
-## Estrutura do repositório
+## Repository structure
 
 ```txt
 src/
-  CodePass.Web/      Aplicação web Blazor, serviços, persistência e analyzers.
-  CodePass.Cli/      CLI para executar análise de regras/cobertura.
+  CodePass.Web/       Blazor web app, services, persistence, and analyzers.
+  CodePass.Cli/       CLI for rule and coverage analysis.
 
 tests/
-  CodePass.Web.Tests/ Testes automatizados da Web, serviços e analyzers.
+  CodePass.Web.Tests/ Automated tests for the web app, services, and analyzers.
 
-.planning/           Documentação de planejamento, requisitos, roadmap e estado.
-.planning/research/  Pesquisa arquitetural e de produto.
+.planning/            Planning, requirements, roadmap, and state docs.
+.planning/research/   Architecture and product research docs.
 ```
 
-## Instalação e uso
+## Installation and usage
 
-Pré-requisitos:
+Prerequisites:
 
-- .NET SDK 10 instalado.
-- Acesso local aos repositórios/solutions que serão analisados.
-- Para cobertura, os projetos de teste da solution analisada precisam conseguir rodar com `dotnet test --collect:"XPlat Code Coverage"`.
+- .NET SDK 10 installed.
+- Local filesystem access to the repositories/solutions you want to analyze.
+- For coverage analysis, the target solution's test projects must be able to run with `dotnet test --collect:"XPlat Code Coverage"`.
 
-Restaure e valide o repositório:
+Restore and validate the repository:
 
 ```bash
 dotnet restore CodePass.sln
@@ -60,55 +60,55 @@ dotnet test CodePass.sln
 
 ### Web
 
-A Web é a forma principal de uso do CodePass. Ela permite cadastrar solutions, criar regras, selecionar regras por solution, executar análises e visualizar dashboard.
+The web app is the main way to use CodePass. It lets you register solutions, create rules, choose rules per solution, run analyses, and inspect the dashboard.
 
-#### Executar em modo desenvolvimento
+#### Run in development mode
 
 ```bash
 dotnet run --project src/CodePass.Web --urls http://localhost:5000
 ```
 
-Depois acesse:
+Then open:
 
 ```txt
 http://localhost:5000
 ```
 
-Por padrão, a Web usa SQLite com connection string:
+By default, the web app uses SQLite with this connection string:
 
 ```json
 "Data Source=codepass.db"
 ```
 
-A aplicação inicializa o banco local automaticamente na subida. O arquivo `codepass.db` será criado no diretório de trabalho do processo.
+The app initializes the local database automatically on startup. The `codepass.db` file is created in the process working directory.
 
-#### Publicar e executar a Web
+#### Publish and run the web app
 
 ```bash
 dotnet publish src/CodePass.Web -c Release -o ./publish/codepass-web
 ```
 
-Execute a aplicação publicada:
+Run the published app:
 
 ```bash
 dotnet ./publish/codepass-web/CodePass.Web.dll --urls http://localhost:5000
 ```
 
-#### Fluxo básico na Web
+#### Basic web workflow
 
-1. Abra a aplicação no navegador.
-2. Vá em **Solutions** e cadastre o caminho absoluto de uma `.sln` local.
-3. Vá em **Rules** e crie uma regra pelo formulário ou pelo modo raw JSON.
-4. Vá em **Rule Analysis** e habilite as regras desejadas para a solution.
-5. Execute a análise de regras.
-6. Vá em **Coverage Analysis** e execute a análise de cobertura.
-7. Abra o **Dashboard** para ver score, status pass/fail e evidências.
+1. Open the app in a browser.
+2. Go to **Solutions** and register the absolute path to a local `.sln` file.
+3. Go to **Rules** and create a rule with the form editor or raw JSON mode.
+4. Go to **Rule Analysis** and enable the desired rules for the solution.
+5. Run rule analysis.
+6. Go to **Coverage Analysis** and run coverage analysis.
+7. Open the **Dashboard** to see the score, pass/fail status, and evidence.
 
 ### CLI
 
-A CLI permite executar análise sem abrir a UI. Ela é útil para automação local, scripts e validações rápidas.
+The CLI lets you run analysis without opening the web UI. It is useful for local automation, scripts, and quick checks.
 
-#### Executar a CLI pelo projeto
+#### Run the CLI from the project
 
 ```bash
 dotnet run --project src/CodePass.Cli -- analyze \
@@ -118,80 +118,80 @@ dotnet run --project src/CodePass.Cli -- analyze \
   --output codepass-quality.json
 ```
 
-#### Instalar a CLI como ferramenta global
+#### Install the CLI as a global tool
 
-Gere o pacote NuGet local:
+Create a local NuGet package:
 
 ```bash
 dotnet pack src/CodePass.Cli -c Release -o ./artifacts
 ```
 
-Instale como `dotnet tool` global:
+Install it as a global `dotnet tool`:
 
 ```bash
 dotnet tool install --global CodePass.Tool --add-source ./artifacts
 ```
 
-Depois use o comando `codepass` de qualquer diretório:
+Then use the `codepass` command from any directory:
 
 ```bash
 codepass analyze \
-  --solution /caminho/para/App.sln \
-  --rules /caminho/para/rules.json \
+  --solution /path/to/App.sln \
+  --rules /path/to/rules.json \
   --coverage \
-  --output /caminho/para/codepass-quality.json
+  --output /path/to/codepass-quality.json
 ```
 
-Para atualizar uma instalação global local:
+Update a local global-tool installation:
 
 ```bash
 dotnet pack src/CodePass.Cli -c Release -o ./artifacts
 dotnet tool update --global CodePass.Tool --add-source ./artifacts
 ```
 
-Para remover:
+Uninstall it:
 
 ```bash
 dotnet tool uninstall --global CodePass.Tool
 ```
 
-#### Opções principais da CLI
+#### Main CLI options
 
-- `--solution <path>`: caminho da `.sln`.
-- `--rules <path>`: arquivo JSON ou pasta com regras JSON.
-- `--coverage`: executa cobertura.
-- `--output <path>`: salva resultado JSON.
-- `--min-line-coverage <n>`: mínimo de cobertura de linhas.
-- `--min-branch-coverage <n>`: mínimo de cobertura de branches.
-- `--pass-threshold <n>`: score mínimo. Padrão: `80`.
-- `--fail-on-rule-errors <bool>`: falha se houver violações `error`. Padrão: `true`.
-- `--fail-on-rule-warnings <bool>`: falha se houver violações `warning`. Padrão: `false`.
-- `--quiet`: reduz logs de progresso.
+- `--solution <path>`: path to the `.sln` file.
+- `--rules <path>`: JSON file or directory with JSON rules.
+- `--coverage`: run coverage analysis.
+- `--output <path>`: save the result as JSON.
+- `--min-line-coverage <n>`: minimum line coverage percentage.
+- `--min-branch-coverage <n>`: minimum branch coverage percentage.
+- `--pass-threshold <n>`: minimum score. Default: `80`.
+- `--fail-on-rule-errors <bool>`: fail when `error` violations exist. Default: `true`.
+- `--fail-on-rule-warnings <bool>`: fail when `warning` violations exist. Default: `false`.
+- `--quiet`: reduce progress logs.
 
-#### Exemplos de uso da CLI
+#### CLI examples
 
-Somente regras:
+Rules only:
 
 ```bash
 codepass analyze \
-  --solution /caminho/para/App.sln \
-  --rules /caminho/para/rules.json
+  --solution /path/to/App.sln \
+  --rules /path/to/rules.json
 ```
 
-Somente cobertura:
+Coverage only:
 
 ```bash
 codepass analyze \
-  --solution /caminho/para/App.sln \
+  --solution /path/to/App.sln \
   --coverage
 ```
 
-Regras e cobertura com quality gate:
+Rules and coverage with a quality gate:
 
 ```bash
 codepass analyze \
-  --solution /caminho/para/App.sln \
-  --rules /caminho/para/rules \
+  --solution /path/to/App.sln \
+  --rules /path/to/rules \
   --coverage \
   --min-line-coverage 80 \
   --min-branch-coverage 70 \
@@ -199,19 +199,19 @@ codepass analyze \
   --output codepass-quality.json
 ```
 
-A CLI retorna código de saída `0` quando o quality gate passa e `1` quando falha.
+The CLI returns exit code `0` when the quality gate passes and `1` when it fails.
 
-## Regras customizadas
+## Custom rules
 
-As regras do CodePass são sempre C# e usam JSON estruturado. O campo `language` não deve ser informado no JSON de autoria.
+CodePass rules are always C# rules and use structured JSON. Do not include the `language` field in authored rule JSON.
 
-Formato base:
+Base shape:
 
 ```json
 {
   "id": "CP1000",
-  "title": "Título da regra",
-  "description": "Descrição curta.",
+  "title": "Rule title",
+  "description": "Short description.",
   "kind": "method_metrics",
   "schemaVersion": "1.0",
   "severity": "warning",
@@ -227,7 +227,7 @@ Formato base:
 }
 ```
 
-Kinds suportados atualmente incluem:
+Currently supported kinds include:
 
 - `syntax_presence`
 - `forbidden_api_usage`
@@ -244,61 +244,61 @@ Kinds suportados atualmente incluem:
 - `exception_handling`
 - `async_policy`
 
-Veja detalhes completos em [`rules-json-guide.md`](rules-json-guide.md).
+See the full guide in [`rules-json-guide.md`](rules-json-guide.md).
 
-## API local para agentes
+## Local API for agents
 
-Quando o CodePass Web está rodando, agentes locais podem usar endpoints HTTP para listar soluções cadastradas e executar análise de qualidade.
+When CodePass Web is running, local agents can use HTTP endpoints to list registered solutions and run quality analysis.
 
-Fluxo:
+Flow:
 
 ```http
 GET /api/agent-quality/solutions
 POST /api/agent-quality/solutions/{registeredSolutionId}/analyze
 ```
 
-A documentação completa fica em [`SKILL.md`](SKILL.md).
+The full documentation is in [`SKILL.md`](SKILL.md).
 
-## Arquivos Markdown do projeto
+## Project Markdown files
 
-### Documentação principal
+### Main documentation
 
-- [`README.md`](README.md): visão geral do projeto, execução, testes, CLI e mapa da documentação.
-- [`rules-json-guide.md`](rules-json-guide.md): guia atual e prático do formato JSON de regras aceito pela Web e pela CLI.
-- [`dotnet-lint-dsl-guide.md`](dotnet-lint-dsl-guide.md): estudo conceitual sobre como modelar uma DSL estruturada para regras de lint .NET usando Roslyn.
-- [`SKILL.md`](SKILL.md): instruções para agentes locais usarem os endpoints de qualidade do CodePass.
-- [`MEMORY.md`](MEMORY.md): memória operacional com erros anteriores e regras preventivas para futuras alterações.
+- [`README.md`](README.md): project overview, installation, usage, CLI, and documentation map.
+- [`rules-json-guide.md`](rules-json-guide.md): current practical guide for the JSON rule format accepted by the web app and CLI.
+- [`dotnet-lint-dsl-guide.md`](dotnet-lint-dsl-guide.md): conceptual study about modeling a structured DSL for .NET lint rules with Roslyn.
+- [`SKILL.md`](SKILL.md): instructions for local agents that use CodePass quality endpoints.
+- [`MEMORY.md`](MEMORY.md): operational memory with previous mistakes and preventive rules for future changes.
 
-### Planejamento
+### Planning
 
-- [`.planning/PROJECT.md`](.planning/PROJECT.md): definição do produto, valor central, contexto, restrições e decisões principais.
-- [`.planning/REQUIREMENTS.md`](.planning/REQUIREMENTS.md): requisitos v1/v2, itens fora de escopo e rastreabilidade.
-- [`.planning/ROADMAP.md`](.planning/ROADMAP.md): fases do roadmap e progresso por fase/plano.
-- [`.planning/STATE.md`](.planning/STATE.md): estado atual do projeto, progresso, decisões acumuladas e continuidade de sessão.
+- [`.planning/PROJECT.md`](.planning/PROJECT.md): product definition, core value, context, constraints, and key decisions.
+- [`.planning/REQUIREMENTS.md`](.planning/REQUIREMENTS.md): v1/v2 requirements, out-of-scope items, and traceability.
+- [`.planning/ROADMAP.md`](.planning/ROADMAP.md): roadmap phases and progress by phase/plan.
+- [`.planning/STATE.md`](.planning/STATE.md): current project state, progress, accumulated decisions, and session continuity.
 
-### Pesquisa
+### Research
 
-- [`.planning/research/SUMMARY.md`](.planning/research/SUMMARY.md): resumo executivo da pesquisa de produto, arquitetura, stack e riscos.
-- [`.planning/research/ARCHITECTURE.md`](.planning/research/ARCHITECTURE.md): pesquisa arquitetural e desenho recomendado.
-- [`.planning/research/FEATURES.md`](.planning/research/FEATURES.md): análise de funcionalidades esperadas, diferenciais e anti-features.
-- [`.planning/research/STACK.md`](.planning/research/STACK.md): pesquisa de stack recomendada e justificativas.
-- [`.planning/research/PITFALLS.md`](.planning/research/PITFALLS.md): riscos críticos, sinais de alerta e formas de mitigação.
+- [`.planning/research/SUMMARY.md`](.planning/research/SUMMARY.md): executive summary of product, architecture, stack, and risk research.
+- [`.planning/research/ARCHITECTURE.md`](.planning/research/ARCHITECTURE.md): architecture research and recommended design.
+- [`.planning/research/FEATURES.md`](.planning/research/FEATURES.md): expected features, differentiators, and anti-features.
+- [`.planning/research/STACK.md`](.planning/research/STACK.md): stack research and rationale.
+- [`.planning/research/PITFALLS.md`](.planning/research/PITFALLS.md): critical risks, warning signs, and mitigation strategies.
 
-## Escopo e decisões importantes
+## Scope and key decisions
 
-- O v1 é focado apenas em C#/.NET.
-- As regras ativas são autorais; o produto não depende de rule packs de produção embutidos.
-- O catálogo de `kind`s é fechado e controlado pelo engine.
-- O JSON de regras é validado contra os campos suportados por cada `kind`.
-- A análise de regras é baseada em Roslyn, não em busca textual simples.
-- O dashboard mostra o estado atual; histórico e tendências ficam para fases futuras.
+- v1 focuses only on C#/.NET.
+- Active rules are user-authored; the product does not depend on built-in production rule packs.
+- The rule `kind` catalog is closed and controlled by the engine.
+- Rule JSON is validated against the supported fields for each `kind`.
+- Rule analysis is based on Roslyn, not simple text search.
+- The dashboard shows the current state; history and trends are future work.
 
 ## Status
 
-O planejamento v1 está marcado como completo em `.planning/STATE.md`, com as fases principais implementadas:
+The v1 plan is marked as complete in `.planning/STATE.md`, with the main phases implemented:
 
-1. Soluções cadastradas.
-2. Regras autorais.
-3. Análise de regras.
-4. Análise de cobertura.
-5. Dashboard de quality score.
+1. Registered solutions.
+2. User-authored rules.
+3. Rule analysis.
+4. Coverage analysis.
+5. Quality score dashboard.
