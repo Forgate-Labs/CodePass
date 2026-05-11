@@ -11,6 +11,8 @@ return exitCode;
 
 internal static class CodePassCli
 {
+    private const string ProductVersion = "0.1.0";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
@@ -28,7 +30,7 @@ internal static class CodePassCli
         var command = args[0];
         if (!string.Equals(command, "analyze", StringComparison.OrdinalIgnoreCase))
         {
-            error.WriteLine($"Comando desconhecido: {command}");
+            error.WriteLine($"Unknown command: {command}");
             WriteHelp(error);
             return 2;
         }
@@ -45,7 +47,7 @@ internal static class CodePassCli
         }
         catch (Exception exception)
         {
-            error.WriteLine($"CodePass CLI falhou: {exception.Message}");
+            error.WriteLine($"CodePass CLI failed: {exception.Message}");
             return 1;
         }
     }
@@ -55,7 +57,7 @@ internal static class CodePassCli
         var solutionPath = Path.GetFullPath(options.SolutionPath);
         if (!File.Exists(solutionPath))
         {
-            throw new ArgumentException($"Arquivo de solução não encontrado: {solutionPath}");
+            throw new ArgumentException($"Solution file not found: {solutionPath}");
         }
 
         using var cancellation = new CancellationTokenSource();
@@ -111,14 +113,14 @@ internal static class CodePassCli
         var enabledRules = rules.Where(rule => rule.IsEnabled).ToArray();
         if (!options.Quiet)
         {
-            output.WriteLine($"Regras: carregadas {rules.Count}, habilitadas {enabledRules.Length}.");
+            output.WriteLine($"Rules: loaded {rules.Count}, enabled {enabledRules.Length}.");
         }
 
         var startedAtUtc = DateTimeOffset.UtcNow;
         try
         {
             var analyzer = new RoslynRuleAnalyzer();
-            var progress = options.Quiet ? null : new Progress<RuleAnalysisProgressDto>(p => WriteProgress(output, "regras", p.Message, p.PercentComplete, p.Detail));
+            var progress = options.Quiet ? null : new Progress<RuleAnalysisProgressDto>(p => WriteProgress(output, "rules", p.Message, p.PercentComplete, p.Detail));
             var findings = await analyzer.AnalyzeAsync(solutionPath, enabledRules, cancellationToken, progress);
             var completedAtUtc = DateTimeOffset.UtcNow;
             var violations = findings.Select(finding => new RuleViolationCliResult(
@@ -222,19 +224,19 @@ internal static class CodePassCli
 
         if (result.RuleAnalysis is not null)
         {
-            output.WriteLine($"Regras: {result.RuleAnalysis.Status}, {result.RuleAnalysis.RuleCount} regras, {result.RuleAnalysis.TotalViolations} violações ({result.RuleAnalysis.ErrorCount} errors, {result.RuleAnalysis.WarningCount} warnings, {result.RuleAnalysis.InfoCount} info)");
+            output.WriteLine($"Rules: {result.RuleAnalysis.Status}, {result.RuleAnalysis.RuleCount} rules, {result.RuleAnalysis.TotalViolations} violations ({result.RuleAnalysis.ErrorCount} errors, {result.RuleAnalysis.WarningCount} warnings, {result.RuleAnalysis.InfoCount} info)");
             if (!string.IsNullOrWhiteSpace(result.RuleAnalysis.ErrorMessage))
             {
-                output.WriteLine($"Falha em regras: {result.RuleAnalysis.ErrorMessage}");
+                output.WriteLine($"Rule analysis failed: {result.RuleAnalysis.ErrorMessage}");
             }
         }
 
         if (result.CoverageAnalysis is not null)
         {
-            output.WriteLine($"Cobertura: {result.CoverageAnalysis.Status}, linhas {result.CoverageAnalysis.LineCoveragePercent:0.#}% ({result.CoverageAnalysis.CoveredLineCount}/{result.CoverageAnalysis.TotalLineCount}), branches {result.CoverageAnalysis.BranchCoveragePercent:0.#}% ({result.CoverageAnalysis.CoveredBranchCount}/{result.CoverageAnalysis.TotalBranchCount})");
+            output.WriteLine($"Coverage: {result.CoverageAnalysis.Status}, lines {result.CoverageAnalysis.LineCoveragePercent:0.#}% ({result.CoverageAnalysis.CoveredLineCount}/{result.CoverageAnalysis.TotalLineCount}), branches {result.CoverageAnalysis.BranchCoveragePercent:0.#}% ({result.CoverageAnalysis.CoveredBranchCount}/{result.CoverageAnalysis.TotalBranchCount})");
             if (!string.IsNullOrWhiteSpace(result.CoverageAnalysis.ErrorMessage))
             {
-                output.WriteLine($"Falha em cobertura: {result.CoverageAnalysis.ErrorMessage}");
+                output.WriteLine($"Coverage analysis failed: {result.CoverageAnalysis.ErrorMessage}");
             }
         }
 
@@ -268,25 +270,26 @@ internal static class CodePassCli
 
     private static void WriteHelp(TextWriter writer)
     {
-        writer.WriteLine("""
+        writer.WriteLine($"""
 CodePass CLI
+Version: {ProductVersion}
 
-Uso:
-  codepass analyze --solution <path.sln> [--rules <arquivo-ou-pasta>] [--coverage] [opções]
+Usage:
+  codepass analyze --solution <path.sln> [--rules <file-or-directory>] [--coverage] [options]
 
-Opções:
-  --solution <path>              Caminho para a solution .sln. Obrigatório.
-  --rules <path>                 Pasta com *.json ou arquivo JSON com uma regra/array de regras.
-  --coverage                     Executa dotnet test com XPlat Code Coverage.
-  --output <path>                Salva resultado JSON.
-  --min-line-coverage <n>        Percentual mínimo de cobertura de linhas.
-  --min-branch-coverage <n>      Percentual mínimo de cobertura de branches.
-  --pass-threshold <n>           Score mínimo. Padrão: 80.
-  --fail-on-rule-errors <bool>   Falha se houver violações Error. Padrão: true.
-  --fail-on-rule-warnings <bool> Falha se houver violações Warning. Padrão: false.
-  --quiet                        Reduz logs de progresso.
+Options:
+  --solution <path>              Path to the .sln file. Required.
+  --rules <path>                 Directory with *.json files or a JSON file with one rule or an array of rules.
+  --coverage                     Runs dotnet test with XPlat Code Coverage.
+  --output <path>                Saves the result as JSON.
+  --min-line-coverage <n>        Minimum line coverage percentage.
+  --min-branch-coverage <n>      Minimum branch coverage percentage.
+  --pass-threshold <n>           Minimum score. Default: 80.
+  --fail-on-rule-errors <bool>   Fails when Error violations exist. Default: true.
+  --fail-on-rule-warnings <bool> Fails when Warning violations exist. Default: false.
+  --quiet                        Reduces progress logs.
 
-Exemplo:
+Example:
   codepass analyze --solution CodePass.sln --coverage --rules .codepass/rules --output codepass-quality.json
 """);
     }
@@ -353,18 +356,18 @@ internal sealed record AnalyzeOptions(
                     quiet = true;
                     break;
                 default:
-                    throw new ArgumentException($"Opção desconhecida: {arg}");
+                    throw new ArgumentException($"Unknown option: {arg}");
             }
         }
 
         if (string.IsNullOrWhiteSpace(solution))
         {
-            throw new ArgumentException("Informe --solution <path.sln>.");
+            throw new ArgumentException("Provide --solution <path.sln>.");
         }
 
         if (string.IsNullOrWhiteSpace(rules) && !coverage)
         {
-            throw new ArgumentException("Informe --rules, --coverage ou ambos.");
+            throw new ArgumentException("Provide --rules, --coverage, or both.");
         }
 
         return new AnalyzeOptions(solution, rules, coverage, output, minLineCoverage, minBranchCoverage, passThreshold, failOnRuleErrors, failOnRuleWarnings, quiet);
@@ -374,7 +377,7 @@ internal sealed record AnalyzeOptions(
     {
         if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
         {
-            throw new ArgumentException($"Informe um valor para {option}.");
+            throw new ArgumentException($"Provide a value for {option}.");
         }
 
         index++;
@@ -385,7 +388,7 @@ internal sealed record AnalyzeOptions(
     {
         if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
         {
-            throw new ArgumentException($"Valor inválido para {option}: {value}");
+            throw new ArgumentException($"Invalid value for {option}: {value}");
         }
 
         return parsed;
@@ -395,7 +398,7 @@ internal sealed record AnalyzeOptions(
     {
         if (!bool.TryParse(value, out var parsed))
         {
-            throw new ArgumentException($"Valor inválido para {option}: {value}. Use true ou false.");
+            throw new ArgumentException($"Invalid value for {option}: {value}. Use true or false.");
         }
 
         return parsed;
@@ -429,7 +432,7 @@ internal static class RuleFileLoader
             return await LoadFileAsync(fullPath, cancellationToken);
         }
 
-        throw new ArgumentException($"Caminho de regras não encontrado: {fullPath}");
+        throw new ArgumentException($"Rules path not found: {fullPath}");
     }
 
     private static async Task<IReadOnlyList<AuthoredRuleDefinitionDto>> LoadFileAsync(string file, CancellationToken cancellationToken)
@@ -446,7 +449,7 @@ internal static class RuleFileLoader
             return [ParseRule(document.RootElement, file)];
         }
 
-        throw new InvalidOperationException($"Arquivo de regra deve conter objeto ou array JSON: {file}");
+        throw new InvalidOperationException($"Rule file must contain a JSON object or array: {file}");
     }
 
     private static AuthoredRuleDefinitionDto ParseRule(JsonElement element, string source)
@@ -454,7 +457,7 @@ internal static class RuleFileLoader
         var language = GetOptionalString(element, "language") ?? "csharp";
         if (!string.Equals(language, "csharp", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"Regra em {source} deve usar language 'csharp'.");
+            throw new InvalidOperationException($"Rule in {source} must use language 'csharp'.");
         }
 
         var code = GetRequiredString(element, "id", "code");
@@ -469,7 +472,7 @@ internal static class RuleFileLoader
 
         if (!Enum.TryParse<RuleSeverity>(severityText, ignoreCase: true, out var severity) || !Enum.IsDefined(severity))
         {
-            throw new InvalidOperationException($"Regra '{code}' em {source} possui severity inválida: {severityText}.");
+            throw new InvalidOperationException($"Rule '{code}' in {source} has invalid severity: {severityText}.");
         }
 
         var raw = JsonSerializer.Serialize(element, NormalizedJsonOptions);
@@ -498,7 +501,7 @@ internal static class RuleFileLoader
 
         if (property.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException($"Propriedade '{propertyName}' deve ser objeto JSON.");
+            throw new InvalidOperationException($"Property '{propertyName}' must be a JSON object.");
         }
 
         return property.Clone();
@@ -509,7 +512,7 @@ internal static class RuleFileLoader
         var value = propertyNames.Select(name => GetOptionalString(element, name)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new InvalidOperationException($"Regra JSON sem propriedade obrigatória: {string.Join(" ou ", propertyNames)}.");
+            throw new InvalidOperationException($"Rule JSON is missing required property: {string.Join(" or ", propertyNames)}.");
         }
 
         return value.Trim();
@@ -563,7 +566,7 @@ internal static class QualityScoreCalculator
     {
         if (run is null)
         {
-            return new QualityRuleContributionCliResult(100, 0, "Missing", 0, 0, 0, 0, "Análise de regras não executada.", []);
+            return new QualityRuleContributionCliResult(100, 0, "Missing", 0, 0, 0, 0, "Rule analysis was not run.", []);
         }
 
         if (run.Status != AnalysisStatus.Succeeded)
@@ -583,14 +586,14 @@ internal static class QualityScoreCalculator
         else if (run.WarningCount > 0) score = Math.Min(score, 95);
         else if (run.InfoCount > 0) score = Math.Min(score, 98);
 
-        return new QualityRuleContributionCliResult(100, Round(Clamp(score)), "Succeeded", run.ErrorCount, run.WarningCount, run.InfoCount, run.TotalViolations, $"{run.TotalViolations} violações.", []);
+        return new QualityRuleContributionCliResult(100, Round(Clamp(score)), "Succeeded", run.ErrorCount, run.WarningCount, run.InfoCount, run.TotalViolations, $"{run.TotalViolations} violations.", []);
     }
 
     private static QualityCoverageContributionCliResult CalculateCoverageContribution(CoverageAnalysisCliResult? run)
     {
         if (run is null)
         {
-            return new QualityCoverageContributionCliResult(100, 0, "Missing", null, null, null, "Análise de cobertura não executada.", []);
+            return new QualityCoverageContributionCliResult(100, 0, "Missing", null, null, null, "Coverage analysis was not run.", []);
         }
 
         if (run.Status != AnalysisStatus.Succeeded)
@@ -611,13 +614,13 @@ internal static class QualityGate
     public static QualityGateCliResult Evaluate(RuleAnalysisCliResult? rules, CoverageAnalysisCliResult? coverage, QualityScoreCliResult score, AnalyzeOptions options)
     {
         var reasons = new List<string>();
-        if (rules?.Status == AnalysisStatus.Failed) reasons.Add($"Análise de regras falhou: {rules.ErrorMessage}");
-        if (coverage?.Status == AnalysisStatus.Failed) reasons.Add($"Análise de cobertura falhou: {coverage.ErrorMessage}");
-        if (options.FailOnRuleErrors && rules?.ErrorCount > 0) reasons.Add($"Análise de regras encontrou {rules.ErrorCount} violação(ões) Error.");
-        if (options.FailOnRuleWarnings && rules?.WarningCount > 0) reasons.Add($"Análise de regras encontrou {rules.WarningCount} violação(ões) Warning.");
-        if (options.MinLineCoverage is not null && coverage is not null && coverage.LineCoveragePercent < options.MinLineCoverage) reasons.Add($"Cobertura de linhas {coverage.LineCoveragePercent:0.#}% abaixo do mínimo {options.MinLineCoverage:0.#}%.");
-        if (options.MinBranchCoverage is not null && coverage is not null && coverage.BranchCoveragePercent < options.MinBranchCoverage) reasons.Add($"Cobertura de branches {coverage.BranchCoveragePercent:0.#}% abaixo do mínimo {options.MinBranchCoverage:0.#}%.");
-        if (score.Status == QualityScoreStatus.Fail) reasons.Add($"Quality score {score.Score:0.#} abaixo do threshold {options.PassThreshold:0.#} ou evidências obrigatórias falharam.");
+        if (rules?.Status == AnalysisStatus.Failed) reasons.Add($"Rule analysis failed: {rules.ErrorMessage}");
+        if (coverage?.Status == AnalysisStatus.Failed) reasons.Add($"Coverage analysis failed: {coverage.ErrorMessage}");
+        if (options.FailOnRuleErrors && rules?.ErrorCount > 0) reasons.Add($"Rule analysis found {rules.ErrorCount} Error violation(s).");
+        if (options.FailOnRuleWarnings && rules?.WarningCount > 0) reasons.Add($"Rule analysis found {rules.WarningCount} Warning violation(s).");
+        if (options.MinLineCoverage is not null && coverage is not null && coverage.LineCoveragePercent < options.MinLineCoverage) reasons.Add($"Line coverage {coverage.LineCoveragePercent:0.#}% is below the minimum {options.MinLineCoverage:0.#}%.");
+        if (options.MinBranchCoverage is not null && coverage is not null && coverage.BranchCoveragePercent < options.MinBranchCoverage) reasons.Add($"Branch coverage {coverage.BranchCoveragePercent:0.#}% is below the minimum {options.MinBranchCoverage:0.#}%.");
+        if (score.Status == QualityScoreStatus.Fail) reasons.Add($"Quality score {score.Score:0.#} is below the threshold {options.PassThreshold:0.#} or required evidence failed.");
 
         return new QualityGateCliResult(reasons.Count == 0, reasons);
     }

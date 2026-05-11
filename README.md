@@ -1,5 +1,7 @@
 # CodePass
 
+Current version: `0.1.0`
+
 CodePass is a self-hosted code quality platform for C#/.NET solutions. It focuses on local, lightweight, deeply .NET-native analysis with customizable JSON rules executed on top of Roslyn.
 
 The product is inspired by quality platforms such as SonarQube, but with a narrower scope: C#/.NET, local execution, user-authored rules, and a simple workflow to register a `.sln`, run analyses, and understand whether the project passes or fails.
