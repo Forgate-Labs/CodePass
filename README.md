@@ -17,6 +17,7 @@ The product is inspired by quality platforms such as SonarQube, but with a narro
 - Persist analysis runs and violations.
 - Run coverage analysis with `dotnet test --collect:"XPlat Code Coverage"`.
 - Normalize coverage at project and class level.
+- Measure duplicated code percentage from the CLI.
 - Show a dashboard with quality score, pass/fail status, and rule/coverage evidence.
 - Expose a local API for agents to run quality analysis.
 - Provide a CLI for headless analysis.
@@ -36,7 +37,7 @@ The product is inspired by quality platforms such as SonarQube, but with a narro
 ```txt
 src/
   CodePass.Web/       Blazor web app, services, persistence, and analyzers.
-  CodePass.Cli/       CLI for rule and coverage analysis.
+  CodePass.Cli/       CLI for rule, coverage, and duplicated-code analysis.
 
 tests/
   CodePass.Web.Tests/ Automated tests for the web app, services, and analyzers.
@@ -117,6 +118,7 @@ dotnet run --project src/CodePass.Cli -- analyze \
   --solution CodePass.sln \
   --rules ./rules.json \
   --coverage \
+  --duplication \
   --output codepass-quality.json
 ```
 
@@ -141,6 +143,7 @@ codepass analyze \
   --solution /path/to/App.sln \
   --rules /path/to/rules.json \
   --coverage \
+  --duplication \
   --output /path/to/codepass-quality.json
 ```
 
@@ -162,9 +165,13 @@ dotnet tool uninstall --global CodePass.Tool
 - `--solution <path>`: path to the `.sln` file.
 - `--rules <path>`: JSON file or directory with JSON rules.
 - `--coverage`: run coverage analysis.
+- `--duplication`: measure duplicated code percentage.
 - `--output <path>`: save the result as JSON.
 - `--min-line-coverage <n>`: minimum line coverage percentage.
 - `--min-branch-coverage <n>`: minimum branch coverage percentage.
+- `--max-duplication <n>`: maximum duplicated code percentage allowed by the quality gate.
+- `--duplication-min-lines <n>`: minimum normalized lines per duplicate block. Default: `10`.
+- `--duplication-min-tokens <n>`: minimum tokens per duplicate block. Default: `50`.
 - `--pass-threshold <n>`: minimum score. Default: `80`.
 - `--fail-on-rule-errors <bool>`: fail when `error` violations exist. Default: `true`.
 - `--fail-on-rule-warnings <bool>`: fail when `warning` violations exist. Default: `false`.
@@ -188,18 +195,32 @@ codepass analyze \
   --coverage
 ```
 
-Rules and coverage with a quality gate:
+Duplicated-code analysis only:
+
+```bash
+codepass analyze \
+  --solution /path/to/App.sln \
+  --duplication \
+  --max-duplication 5 \
+  --duplication-min-lines 20
+```
+
+Rules, coverage, and duplicated-code analysis with a quality gate:
 
 ```bash
 codepass analyze \
   --solution /path/to/App.sln \
   --rules /path/to/rules \
   --coverage \
+  --duplication \
   --min-line-coverage 80 \
   --min-branch-coverage 70 \
+  --max-duplication 5 \
   --pass-threshold 85 \
   --output codepass-quality.json
 ```
+
+Duplicated-code analysis normalizes C# syntax tokens, ignores comments/trivia and generated/build-output files, and reports duplicated lines, duplicate block count, and representative occurrences in the JSON output.
 
 The CLI returns exit code `0` when the quality gate passes and `1` when it fails.
 

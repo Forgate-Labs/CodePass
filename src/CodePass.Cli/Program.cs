@@ -70,6 +70,7 @@ internal static class CodePassCli
         var startedAtUtc = DateTimeOffset.UtcNow;
         RuleAnalysisCliResult? ruleAnalysis = null;
         CoverageAnalysisCliResult? coverageAnalysis = null;
+        DuplicateCodeAnalysisCliResult? duplicateCodeAnalysis = null;
 
         if (!string.IsNullOrWhiteSpace(options.RulesPath))
         {
@@ -82,15 +83,21 @@ internal static class CodePassCli
             coverageAnalysis = await RunCoverageAnalysisAsync(solutionPath, options, output, cancellation.Token);
         }
 
-        var qualityScore = QualityScoreCalculator.Calculate(ruleAnalysis, coverageAnalysis, options.PassThreshold);
+        if (options.RunDuplication)
+        {
+            duplicateCodeAnalysis = await RunDuplicateCodeAnalysisAsync(solutionPath, options, output, cancellation.Token);
+        }
+
+        var qualityScore = QualityScoreCalculator.Calculate(ruleAnalysis, coverageAnalysis, duplicateCodeAnalysis, options.PassThreshold);
         var result = new CodePassAnalysisResult(
             solutionPath,
             startedAtUtc,
             DateTimeOffset.UtcNow,
             ruleAnalysis,
             coverageAnalysis,
+            duplicateCodeAnalysis,
             qualityScore,
-            QualityGate.Evaluate(ruleAnalysis, coverageAnalysis, qualityScore, options));
+            QualityGate.Evaluate(ruleAnalysis, coverageAnalysis, duplicateCodeAnalysis, qualityScore, options));
 
         if (!string.IsNullOrWhiteSpace(options.OutputPath))
         {
@@ -217,6 +224,38 @@ internal static class CodePassCli
         }
     }
 
+    private static async Task<DuplicateCodeAnalysisCliResult> RunDuplicateCodeAnalysisAsync(
+        string solutionPath,
+        AnalyzeOptions options,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        var startedAtUtc = DateTimeOffset.UtcNow;
+        try
+        {
+            var analyzer = new DuplicateCodeAnalyzer();
+            var progress = options.Quiet ? null : new Progress<DuplicateCodeAnalysisProgressDto>(p => WriteProgress(output, "duplication", p.Message, p.PercentComplete, p.Detail));
+            return await analyzer.AnalyzeAsync(solutionPath, options.DuplicationMinLines, options.DuplicationMinTokens, cancellationToken, progress);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new DuplicateCodeAnalysisCliResult(
+                AnalysisStatus.Failed,
+                startedAtUtc,
+                DateTimeOffset.UtcNow,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                options.DuplicationMinLines,
+                options.DuplicationMinTokens,
+                exception.Message,
+                []);
+        }
+    }
+
     private static void WriteSummary(CodePassAnalysisResult result, TextWriter output, TextWriter error)
     {
         output.WriteLine();
@@ -237,6 +276,15 @@ internal static class CodePassCli
             if (!string.IsNullOrWhiteSpace(result.CoverageAnalysis.ErrorMessage))
             {
                 output.WriteLine($"Coverage analysis failed: {result.CoverageAnalysis.ErrorMessage}");
+            }
+        }
+
+        if (result.DuplicateCodeAnalysis is not null)
+        {
+            output.WriteLine($"Duplicated code: {result.DuplicateCodeAnalysis.Status}, {result.DuplicateCodeAnalysis.DuplicatedCodePercent:0.#}% ({result.DuplicateCodeAnalysis.DuplicatedLineCount}/{result.DuplicateCodeAnalysis.TotalLineCount} lines), {result.DuplicateCodeAnalysis.DuplicateBlockCount} duplicate block(s)");
+            if (!string.IsNullOrWhiteSpace(result.DuplicateCodeAnalysis.ErrorMessage))
+            {
+                output.WriteLine($"Duplicate code analysis failed: {result.DuplicateCodeAnalysis.ErrorMessage}");
             }
         }
 
@@ -275,22 +323,26 @@ CodePass CLI
 Version: {ProductVersion}
 
 Usage:
-  codepass analyze --solution <path.sln> [--rules <file-or-directory>] [--coverage] [options]
+  codepass analyze --solution <path.sln> [--rules <file-or-directory>] [--coverage] [--duplication] [options]
 
 Options:
   --solution <path>              Path to the .sln file. Required.
   --rules <path>                 Directory with *.json files or a JSON file with one rule or an array of rules.
   --coverage                     Runs dotnet test with XPlat Code Coverage.
+  --duplication                  Calculates the duplicated code percentage.
   --output <path>                Saves the result as JSON.
   --min-line-coverage <n>        Minimum line coverage percentage.
   --min-branch-coverage <n>      Minimum branch coverage percentage.
+  --max-duplication <n>          Maximum duplicated code percentage.
+  --duplication-min-lines <n>    Minimum normalized lines per duplicate block. Default: 10.
+  --duplication-min-tokens <n>   Minimum tokens per duplicate block. Default: 50.
   --pass-threshold <n>           Minimum score. Default: 80.
   --fail-on-rule-errors <bool>   Fails when Error violations exist. Default: true.
   --fail-on-rule-warnings <bool> Fails when Warning violations exist. Default: false.
   --quiet                        Reduces progress logs.
 
 Example:
-  codepass analyze --solution CodePass.sln --coverage --rules .codepass/rules --output codepass-quality.json
+  codepass analyze --solution CodePass.sln --coverage --duplication --rules .codepass/rules --output codepass-quality.json
 """);
     }
 }
@@ -299,9 +351,13 @@ internal sealed record AnalyzeOptions(
     string SolutionPath,
     string? RulesPath,
     bool RunCoverage,
+    bool RunDuplication,
     string? OutputPath,
     double? MinLineCoverage,
     double? MinBranchCoverage,
+    double? MaxDuplication,
+    int DuplicationMinLines,
+    int DuplicationMinTokens,
     double PassThreshold,
     bool FailOnRuleErrors,
     bool FailOnRuleWarnings,
@@ -312,9 +368,13 @@ internal sealed record AnalyzeOptions(
         string? solution = null;
         string? rules = null;
         var coverage = false;
+        var duplication = false;
         string? output = null;
         double? minLineCoverage = null;
         double? minBranchCoverage = null;
+        double? maxDuplication = null;
+        var duplicationMinLines = 10;
+        var duplicationMinTokens = 50;
         var passThreshold = 80d;
         var failOnRuleErrors = true;
         var failOnRuleWarnings = false;
@@ -334,6 +394,9 @@ internal sealed record AnalyzeOptions(
                 case "--coverage":
                     coverage = true;
                     break;
+                case "--duplication":
+                    duplication = true;
+                    break;
                 case "--output":
                     output = RequireValue(args, ref i, arg);
                     break;
@@ -342,6 +405,15 @@ internal sealed record AnalyzeOptions(
                     break;
                 case "--min-branch-coverage":
                     minBranchCoverage = ParseDouble(RequireValue(args, ref i, arg), arg);
+                    break;
+                case "--max-duplication":
+                    maxDuplication = ParseDouble(RequireValue(args, ref i, arg), arg);
+                    break;
+                case "--duplication-min-lines":
+                    duplicationMinLines = ParsePositiveInt(RequireValue(args, ref i, arg), arg);
+                    break;
+                case "--duplication-min-tokens":
+                    duplicationMinTokens = ParsePositiveInt(RequireValue(args, ref i, arg), arg);
                     break;
                 case "--pass-threshold":
                     passThreshold = ParseDouble(RequireValue(args, ref i, arg), arg);
@@ -365,12 +437,12 @@ internal sealed record AnalyzeOptions(
             throw new ArgumentException("Provide --solution <path.sln>.");
         }
 
-        if (string.IsNullOrWhiteSpace(rules) && !coverage)
+        if (string.IsNullOrWhiteSpace(rules) && !coverage && !duplication)
         {
-            throw new ArgumentException("Provide --rules, --coverage, or both.");
+            throw new ArgumentException("Provide --rules, --coverage, --duplication, or a combination of them.");
         }
 
-        return new AnalyzeOptions(solution, rules, coverage, output, minLineCoverage, minBranchCoverage, passThreshold, failOnRuleErrors, failOnRuleWarnings, quiet);
+        return new AnalyzeOptions(solution, rules, coverage, duplication, output, minLineCoverage, minBranchCoverage, maxDuplication, duplicationMinLines, duplicationMinTokens, passThreshold, failOnRuleErrors, failOnRuleWarnings, quiet);
     }
 
     private static string RequireValue(string[] args, ref int index, string option)
@@ -389,6 +461,16 @@ internal sealed record AnalyzeOptions(
         if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
         {
             throw new ArgumentException($"Invalid value for {option}: {value}");
+        }
+
+        return parsed;
+    }
+
+    private static int ParsePositiveInt(string value, string option)
+    {
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed <= 0)
+        {
+            throw new ArgumentException($"Invalid value for {option}: {value}. Use a positive integer.");
         }
 
         return parsed;
@@ -535,10 +617,11 @@ internal static class RuleFileLoader
 
 internal static class QualityScoreCalculator
 {
-    public static QualityScoreCliResult Calculate(RuleAnalysisCliResult? ruleAnalysis, CoverageAnalysisCliResult? coverageAnalysis, double passThreshold)
+    public static QualityScoreCliResult Calculate(RuleAnalysisCliResult? ruleAnalysis, CoverageAnalysisCliResult? coverageAnalysis, DuplicateCodeAnalysisCliResult? duplicateCodeAnalysis, double passThreshold)
     {
-        var ruleContribution = CalculateRuleContribution(ruleAnalysis, coverageAnalysis?.TotalLineCount);
+        var ruleContribution = CalculateRuleContribution(ruleAnalysis, coverageAnalysis?.TotalLineCount ?? duplicateCodeAnalysis?.TotalLineCount);
         var coverageContribution = CalculateCoverageContribution(coverageAnalysis);
+        var duplicateCodeContribution = CalculateDuplicateCodeContribution(duplicateCodeAnalysis);
         var executedContributions = new List<double>();
         if (ruleAnalysis is not null)
         {
@@ -550,16 +633,22 @@ internal static class QualityScoreCalculator
             executedContributions.Add(coverageContribution.EarnedPoints);
         }
 
+        if (duplicateCodeAnalysis is not null)
+        {
+            executedContributions.Add(duplicateCodeContribution.EarnedPoints);
+        }
+
         var score = executedContributions.Count == 0 ? 0 : Round(executedContributions.Average());
-        var blockingReasons = ruleContribution.BlockingReasons.Concat(coverageContribution.BlockingReasons).ToArray();
+        var blockingReasons = ruleContribution.BlockingReasons.Concat(coverageContribution.BlockingReasons).Concat(duplicateCodeContribution.BlockingReasons).ToArray();
         var status = score >= passThreshold
             && (ruleAnalysis is null || ruleAnalysis.Status == AnalysisStatus.Succeeded)
             && (coverageAnalysis is null || coverageAnalysis.Status == AnalysisStatus.Succeeded)
+            && (duplicateCodeAnalysis is null || duplicateCodeAnalysis.Status == AnalysisStatus.Succeeded)
             && (ruleAnalysis?.ErrorCount ?? 0) == 0
                 ? QualityScoreStatus.Pass
                 : QualityScoreStatus.Fail;
 
-        return new QualityScoreCliResult(score, status, ruleContribution, coverageContribution, blockingReasons);
+        return new QualityScoreCliResult(score, status, ruleContribution, coverageContribution, duplicateCodeContribution, blockingReasons);
     }
 
     private static QualityRuleContributionCliResult CalculateRuleContribution(RuleAnalysisCliResult? run, int? totalLineCount)
@@ -605,21 +694,40 @@ internal static class QualityScoreCalculator
         return new QualityCoverageContributionCliResult(100, Round(Clamp(run.LineCoveragePercent)), "Succeeded", run.LineCoveragePercent, run.CoveredLineCount, run.TotalLineCount, $"{run.LineCoveragePercent:0.#}% line coverage.", []);
     }
 
+    private static QualityDuplicateCodeContributionCliResult CalculateDuplicateCodeContribution(DuplicateCodeAnalysisCliResult? run)
+    {
+        if (run is null)
+        {
+            return new QualityDuplicateCodeContributionCliResult(100, 0, "Missing", null, null, null, "Duplicate code analysis was not run.", []);
+        }
+
+        if (run.Status != AnalysisStatus.Succeeded)
+        {
+            var reason = string.IsNullOrWhiteSpace(run.ErrorMessage) ? "Duplicate-code evidence failed." : $"Duplicate-code evidence failed: {run.ErrorMessage}";
+            return new QualityDuplicateCodeContributionCliResult(100, 0, "Failed", run.DuplicatedCodePercent, run.DuplicatedLineCount, run.TotalLineCount, reason, [reason]);
+        }
+
+        var score = 100 - run.DuplicatedCodePercent;
+        return new QualityDuplicateCodeContributionCliResult(100, Round(Clamp(score)), "Succeeded", run.DuplicatedCodePercent, run.DuplicatedLineCount, run.TotalLineCount, $"{run.DuplicatedCodePercent:0.#}% duplicated code.", []);
+    }
+
     private static double Clamp(double value) => Math.Min(Math.Max(value, 0), 100);
     private static double Round(double value) => Math.Round(value, 1, MidpointRounding.AwayFromZero);
 }
 
 internal static class QualityGate
 {
-    public static QualityGateCliResult Evaluate(RuleAnalysisCliResult? rules, CoverageAnalysisCliResult? coverage, QualityScoreCliResult score, AnalyzeOptions options)
+    public static QualityGateCliResult Evaluate(RuleAnalysisCliResult? rules, CoverageAnalysisCliResult? coverage, DuplicateCodeAnalysisCliResult? duplication, QualityScoreCliResult score, AnalyzeOptions options)
     {
         var reasons = new List<string>();
         if (rules?.Status == AnalysisStatus.Failed) reasons.Add($"Rule analysis failed: {rules.ErrorMessage}");
         if (coverage?.Status == AnalysisStatus.Failed) reasons.Add($"Coverage analysis failed: {coverage.ErrorMessage}");
+        if (duplication?.Status == AnalysisStatus.Failed) reasons.Add($"Duplicate code analysis failed: {duplication.ErrorMessage}");
         if (options.FailOnRuleErrors && rules?.ErrorCount > 0) reasons.Add($"Rule analysis found {rules.ErrorCount} Error violation(s).");
         if (options.FailOnRuleWarnings && rules?.WarningCount > 0) reasons.Add($"Rule analysis found {rules.WarningCount} Warning violation(s).");
         if (options.MinLineCoverage is not null && coverage is not null && coverage.LineCoveragePercent < options.MinLineCoverage) reasons.Add($"Line coverage {coverage.LineCoveragePercent:0.#}% is below the minimum {options.MinLineCoverage:0.#}%.");
         if (options.MinBranchCoverage is not null && coverage is not null && coverage.BranchCoveragePercent < options.MinBranchCoverage) reasons.Add($"Branch coverage {coverage.BranchCoveragePercent:0.#}% is below the minimum {options.MinBranchCoverage:0.#}%.");
+        if (options.MaxDuplication is not null && duplication is not null && duplication.DuplicatedCodePercent > options.MaxDuplication) reasons.Add($"Duplicated code {duplication.DuplicatedCodePercent:0.#}% is above the maximum {options.MaxDuplication:0.#}%.");
         if (score.Status == QualityScoreStatus.Fail) reasons.Add($"Quality score {score.Score:0.#} is below the threshold {options.PassThreshold:0.#} or required evidence failed.");
 
         return new QualityGateCliResult(reasons.Count == 0, reasons);
@@ -629,11 +737,12 @@ internal static class QualityGate
 internal enum AnalysisStatus { Succeeded, Failed }
 internal enum QualityScoreStatus { Fail, Pass }
 
-internal sealed record CodePassAnalysisResult(string SolutionPath, DateTimeOffset StartedAtUtc, DateTimeOffset CompletedAtUtc, RuleAnalysisCliResult? RuleAnalysis, CoverageAnalysisCliResult? CoverageAnalysis, QualityScoreCliResult QualityScore, QualityGateCliResult QualityGate);
+internal sealed record CodePassAnalysisResult(string SolutionPath, DateTimeOffset StartedAtUtc, DateTimeOffset CompletedAtUtc, RuleAnalysisCliResult? RuleAnalysis, CoverageAnalysisCliResult? CoverageAnalysis, DuplicateCodeAnalysisCliResult? DuplicateCodeAnalysis, QualityScoreCliResult QualityScore, QualityGateCliResult QualityGate);
 internal sealed record RuleAnalysisCliResult(AnalysisStatus Status, DateTimeOffset StartedAtUtc, DateTimeOffset CompletedAtUtc, int RuleCount, int TotalViolations, int ErrorCount, int WarningCount, int InfoCount, string? ErrorMessage, IReadOnlyList<RuleViolationCliResult> Violations);
 internal sealed record RuleViolationCliResult(string RuleCode, string RuleTitle, string RuleKind, RuleSeverity Severity, string Message, string FilePath, int StartLine, int StartColumn, int EndLine, int EndColumn);
 internal sealed record CoverageAnalysisCliResult(AnalysisStatus Status, DateTimeOffset StartedAtUtc, DateTimeOffset CompletedAtUtc, int ProjectCount, int ClassCount, int CoveredLineCount, int TotalLineCount, double LineCoveragePercent, int CoveredBranchCount, int TotalBranchCount, double BranchCoveragePercent, string? ErrorMessage, IReadOnlyList<CodePass.Web.Services.CoverageAnalysis.CoverageProjectSummary> ProjectSummaries, IReadOnlyList<CodePass.Web.Services.CoverageAnalysis.CoverageClassCoverage> ClassCoverages);
-internal sealed record QualityScoreCliResult(double Score, QualityScoreStatus Status, QualityRuleContributionCliResult RuleContribution, QualityCoverageContributionCliResult CoverageContribution, IReadOnlyList<string> BlockingReasons);
+internal sealed record QualityScoreCliResult(double Score, QualityScoreStatus Status, QualityRuleContributionCliResult RuleContribution, QualityCoverageContributionCliResult CoverageContribution, QualityDuplicateCodeContributionCliResult DuplicateCodeContribution, IReadOnlyList<string> BlockingReasons);
 internal sealed record QualityRuleContributionCliResult(double MaxPoints, double EarnedPoints, string EvidenceStatus, int ErrorCount, int WarningCount, int InfoCount, int TotalViolations, string Summary, IReadOnlyList<string> BlockingReasons);
 internal sealed record QualityCoverageContributionCliResult(double MaxPoints, double EarnedPoints, string EvidenceStatus, double? LineCoveragePercent, int? CoveredLineCount, int? TotalLineCount, string Summary, IReadOnlyList<string> BlockingReasons);
+internal sealed record QualityDuplicateCodeContributionCliResult(double MaxPoints, double EarnedPoints, string EvidenceStatus, double? DuplicatedCodePercent, int? DuplicatedLineCount, int? TotalLineCount, string Summary, IReadOnlyList<string> BlockingReasons);
 internal sealed record QualityGateCliResult(bool Passed, IReadOnlyList<string> BlockingReasons);
