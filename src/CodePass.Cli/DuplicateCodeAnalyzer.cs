@@ -236,15 +236,18 @@ internal sealed class DuplicateCodeAnalyzer
         var normalizedPath = filePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
         var separator = Path.DirectorySeparatorChar;
         if (normalizedPath.Contains($"{separator}bin{separator}", StringComparison.OrdinalIgnoreCase)
-            || normalizedPath.Contains($"{separator}obj{separator}", StringComparison.OrdinalIgnoreCase))
+            || normalizedPath.Contains($"{separator}obj{separator}", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains($"{separator}Migrations{separator}", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
 
         var fileName = Path.GetFileName(filePath);
-        return fileName.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)
+        return fileName.EndsWith(".feature.cs", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith(".generated.cs", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith(".designer.cs", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith("ModelSnapshot.cs", StringComparison.OrdinalIgnoreCase)
             || fileName.Equals("AssemblyInfo.cs", StringComparison.OrdinalIgnoreCase)
             || fileName.Equals("GlobalUsings.g.cs", StringComparison.OrdinalIgnoreCase);
     }

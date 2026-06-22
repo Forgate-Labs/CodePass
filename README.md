@@ -220,7 +220,7 @@ codepass analyze \
   --output codepass-quality.json
 ```
 
-Duplicated-code analysis normalizes C# syntax tokens, ignores comments/trivia and generated/build-output files, and reports duplicated lines, duplicate block count, and representative occurrences in the JSON output.
+Duplicated-code analysis normalizes C# syntax tokens, ignores comments/trivia, and skips generated or structural files by default. The default exclusions include build output, generated C# files, `*.feature.cs`, `**/Migrations/**`, and `**/*ModelSnapshot.cs`. The JSON output reports duplicated lines, duplicate block count, and representative occurrences.
 
 The CLI returns exit code `0` when the quality gate passes and `1` when it fails.
 

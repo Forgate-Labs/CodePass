@@ -8,9 +8,9 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>codepass</ToolCommandName>
     <PackageId>CodePass.Tool</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.2</Version>
     <Title>CodePass CLI</Title>
-    <Description>CLI headless para executar análises de regras e cobertura do CodePass.</Description>
+    <Description>Headless CLI for CodePass rule, coverage, and duplicated-code analysis.</Description>
     <Authors>CodePass</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/efacunha/CodePass</RepositoryUrl>

@@ -11,7 +11,7 @@ return exitCode;
 
 internal static class CodePassCli
 {
-    private const string ProductVersion = "0.1.0";
+    private const string ProductVersion = "0.1.2";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
